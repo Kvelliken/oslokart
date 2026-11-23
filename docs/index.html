@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kommunale tomter i Oslo</title>
+<meta name="description" content="Kart over eiendommer Oslo kommune eier, koblet mot matrikkelen. Finn ubebygde tomter og slå opp regulering i Planinnsyn.">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="panel" id="panel">
+    <header class="topp">
+      <h1>Kommunale tomter i Oslo</h1>
+      <p class="ingress">Eiendommer Oslo kommune eier, koblet mot eiendomsgrenser og bygninger i matrikkelen.</p>
+    </header>
+
+    <div class="faner" role="tablist">
+      <button role="tab" id="fane-tomter" class="fane aktiv" aria-selected="true">Ubebygde tomter</button>
+      <button role="tab" id="fane-alle" class="fane" aria-selected="false">Alle eiendommer</button>
+    </div>
+
+    <section class="nokkeltall" aria-live="polite">
+      <div class="tall"><span id="tall-antall">–</span><small id="tall-antall-tekst">tomter</small></div>
+      <div class="tall"><span id="tall-areal">–</span><small>samlet areal</small></div>
+    </section>
+
+    <section class="filter">
+      <label class="felt">
+        <span>Søk på adresse eller gnr/bnr</span>
+        <input type="search" id="sok" placeholder="F.eks. Lilleakerveien eller 10/1061" autocomplete="off">
+      </label>
+
+      <div class="rad">
+        <label class="felt">
+          <span>Bydel</span>
+          <select id="bydel"><option value="">Alle bydeler</option></select>
+        </label>
+        <label class="felt">
+          <span>Minste areal</span>
+          <select id="minareal">
+            <option value="0">Alle</option>
+            <option value="500">500 m²</option>
+            <option value="1000" selected>1 000 m²</option>
+            <option value="2000">2 000 m²</option>
+            <option value="5000">5 000 m²</option>
+            <option value="10000">1 hektar</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset class="felt">
+        <legend>Forvalter</legend>
+        <div id="forvaltere" class="valg"></div>
+      </fieldset>
+
+      <fieldset class="felt kun-tomter">
+        <legend>Hva regnes som ubebygd</legend>
+        <label class="avkryss"><input type="checkbox" id="smaabygg"> Tillat garasjer, uthus og naust</label>
+        <label class="avkryss"><input type="checkbox" id="planlagt"> Ta med tomter med byggesak under arbeid</label>
+        <label class="avkryss"><input type="checkbox" id="marka"> Ta med Marka</label>
+        <label class="avkryss"><input type="checkbox" id="uregistrert"> Ta med uregistrert grunn og «ikke målt»</label>
+      </fieldset>
+    </section>
+
+    <section class="liste">
+      <div class="liste-topp">
+        <h2>Største i utvalget</h2>
+        <button type="button" id="last-ned" class="lenkeknapp">Last ned CSV</button>
+      </div>
+      <ol id="toppliste"></ol>
+    </section>
+
+    <footer class="fot">
+      <p><strong>Uoffisiell oversikt.</strong> Laget av åpne data, ikke et produkt fra Oslo kommune. Sjekk alltid regulering i Planinnsyn og eierforhold i Eiendomsregisteret.</p>
+      <p>Kilder: <a href="https://www.oslo.kommune.no/plan-bygg-og-eiendom/kart-og-eiendomsinformasjon/kommunal-eiendom/eiendomsoversikt">Oslo kommunes eiendomsoversikt</a> (<span id="kilde-dato">oktober 2026</span>), Kartverket – Matrikkelen (CC BY 4.0), bydelsgrenser fra Oslo kommune/Bydelsfakta (MIT). <a href="https://github.com/Kvelliken/oslokart">Kode og metode</a>.</p>
+    </footer>
+  </aside>
+
+  <main class="kart-ramme">
+    <div id="kart" aria-label="Kart over kommunale eiendommer"></div>
+    <div class="tegnforklaring" id="tegnforklaring"></div>
+    <button type="button" class="vis-panel" id="vis-panel" aria-controls="panel">Filter</button>
+  </main>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

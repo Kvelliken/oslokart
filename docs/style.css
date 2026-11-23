@@ -1,0 +1,152 @@
+/* Farger og skrift fra Oslobyggs designsystem (Oslo kommunes visuelle profil) */
+:root {
+  --mork-bla: #2a2859;
+  --bla: #6fe9ff;
+  --lys-bla: #b3f5ff;
+  --mork-gronn: #034b45;
+  --gronn: #4ef8b6;
+  --lys-gronn: #c7f6c9;
+  --rod: #ff8274;
+  --gul: #f9c66b;
+  --beige: #f8f0dd;
+  --mork-beige: #d0bfae;
+  --svart: #000000;
+  --hvit: #ffffff;
+
+  --flate: var(--hvit);
+  --flate-alt: var(--beige);
+  --tekst: var(--svart);
+  --primar: var(--gul);
+
+  --font-sans: "Oslo Sans Office", "Oslo Sans", Arial, sans-serif;
+  --luft-1: 16px;
+  --luft-2: 8px;
+  --luft-3: 4px;
+  --marg: 24px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--tekst);
+  background: var(--flate);
+}
+
+.app { display: flex; height: 100vh; height: 100dvh; }
+
+/* Panel */
+.panel {
+  width: 400px;
+  flex: 0 0 400px;
+  overflow-y: auto;
+  background: var(--flate);
+  border-right: 1px solid var(--mork-beige);
+  display: flex;
+  flex-direction: column;
+}
+.topp { background: var(--primar); padding: var(--marg) var(--marg) var(--luft-1); }
+h1 { font-size: 28px; font-weight: 400; margin: 0 0 var(--luft-2); }
+h2 { font-size: 18px; font-weight: 400; margin: 0; }
+.ingress { margin: 0; font-size: 15px; }
+
+.faner { display: flex; background: var(--primar); padding: 0 var(--marg); gap: 2px; }
+.fane {
+  font: inherit; font-size: 15px;
+  border: 0; border-radius: 0;
+  background: transparent; color: var(--tekst);
+  padding: 10px 14px; cursor: pointer;
+}
+.fane.aktiv { background: var(--flate); }
+.fane:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 3px solid var(--mork-bla); outline-offset: 1px;
+}
+
+.nokkeltall { display: flex; gap: var(--luft-1); padding: var(--luft-1) var(--marg) 0; }
+.tall { flex: 1; background: var(--flate-alt); padding: 12px 14px; }
+.tall span { display: block; font-size: 26px; }
+.tall small { font-size: 13px; }
+
+.filter { padding: var(--luft-1) var(--marg) 0; }
+.felt { display: block; margin: 0 0 var(--luft-1); padding: 0; border: 0; min-width: 0; }
+.felt > span, legend { display: block; font-size: 13px; margin-bottom: var(--luft-3); padding: 0; }
+.rad { display: flex; gap: 12px; }
+.rad .felt { flex: 1; }
+input[type="search"], select {
+  width: 100%;
+  font: inherit; font-size: 15px;
+  padding: 8px 10px;
+  border: 1px solid var(--svart); border-radius: 0;
+  background: var(--hvit); color: var(--tekst);
+}
+.valg { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.avkryss { display: flex; align-items: flex-start; gap: 8px; font-size: 15px; margin-bottom: 6px; cursor: pointer; }
+.avkryss input { margin: 3px 0 0; accent-color: var(--mork-bla); }
+.prikk { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex: 0 0 12px; }
+
+.liste { padding: var(--luft-2) var(--marg) var(--luft-1); border-top: 1px solid var(--mork-beige); }
+.liste-topp { display: flex; justify-content: space-between; align-items: baseline; margin: var(--luft-2) 0; }
+.lenkeknapp {
+  font: inherit; font-size: 14px; background: none; border: 0; padding: 0;
+  color: var(--mork-bla); text-decoration: underline; cursor: pointer;
+}
+#toppliste { list-style: none; margin: 0; padding: 0; }
+#toppliste li button {
+  width: 100%; text-align: left; font: inherit; font-size: 14px;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+  background: none; border: 0; border-bottom: 1px solid var(--flate-alt);
+  padding: 8px 0; cursor: pointer; color: var(--tekst);
+}
+#toppliste li button:hover { background: var(--flate-alt); }
+#toppliste .sted { grid-column: 1 / -1; font-size: 13px; }
+#toppliste .areal { text-align: right; }
+.tom { font-size: 14px; }
+
+.fot { margin-top: auto; padding: var(--luft-1) var(--marg); background: var(--flate-alt); font-size: 12px; }
+.fot p { margin: 0 0 var(--luft-2); }
+a { color: var(--mork-bla); }
+
+/* Kart */
+.kart-ramme { position: relative; flex: 1; min-width: 0; }
+#kart { position: absolute; inset: 0; background: var(--beige); }
+.tegnforklaring {
+  position: absolute; right: 12px; bottom: 28px; z-index: 500;
+  background: var(--flate); padding: 10px 12px; font-size: 13px;
+  border: 1px solid var(--mork-beige);
+}
+.tegnforklaring div { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.tegnforklaring i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--svart); }
+.vis-panel { display: none; }
+
+/* Leaflet-tilpasninger: rette hjørner, ingen skygger */
+.leaflet-container { font-family: var(--font-sans); }
+.leaflet-bar, .leaflet-bar a, .leaflet-popup-content-wrapper, .leaflet-popup-tip,
+.leaflet-control-layers { border-radius: 0 !important; box-shadow: none !important; }
+.leaflet-bar { border: 1px solid var(--svart) !important; }
+.leaflet-popup-content-wrapper { border: 1px solid var(--svart); }
+.leaflet-popup-content { margin: 14px 16px; font-size: 14px; line-height: 1.4; min-width: 240px; }
+.popup h3 { font-size: 18px; font-weight: 400; margin: 0 0 2px; }
+.popup .under { margin: 0 0 var(--luft-2); }
+.popup dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 var(--luft-2); }
+.popup dt { color: var(--tekst); }
+.popup dd { margin: 0; }
+.popup .merk { background: var(--flate-alt); padding: 6px 8px; margin: 0 0 var(--luft-2); font-size: 13px; }
+.popup .lenker { display: flex; flex-direction: column; gap: 4px; }
+.popup .lenker a { font-size: 14px; }
+
+@media (max-width: 800px) {
+  .panel {
+    position: fixed; inset: 0 auto 0 0; width: min(92vw, 400px); z-index: 1000;
+    transform: translateX(-100%); transition: transform .2s;
+  }
+  .panel.apen { transform: none; }
+  .vis-panel {
+    display: block; position: absolute; left: 12px; top: 12px; z-index: 600;
+    font: inherit; font-size: 15px; padding: 8px 14px;
+    background: var(--primar); color: var(--tekst); border: 1px solid var(--svart); border-radius: 0;
+  }
+  .leaflet-top.leaflet-left { top: 52px; }
+}
+[hidden] { display: none !important; }

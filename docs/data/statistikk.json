@@ -1,0 +1,37 @@
+{
+  "kilde_excel": "5065eb00-Oversikt-over-Oslo-kommunes-eiendommer-oktober-2026_nett.xlsx",
+  "eiendommer_i_excel": 6927,
+  "seksjoner_i_excel": 392,
+  "kartobjekter": 6391,
+  "uten_teig": 236,
+  "uten_teig_forvalter": {
+    "Eiendoms- og byfornyelsesetaten": 231,
+    "Oslobygg KF": 4,
+    "Boligbygg Oslo KF": 1
+  },
+  "uten_teig_eksempler": [
+    "0301-102/424/0/0",
+    "0301-102/447/0/0",
+    "0301-104/6/0/0",
+    "0301-105/188/0/0",
+    "0301-109/3/0/0",
+    "0301-112/24/0/0",
+    "0301-112/27/0/0",
+    "0301-114/23/0/0",
+    "0301-120/13/0/0",
+    "0301-122/19/0/0",
+    "0301-122/25/0/0",
+    "0301-122/369/0/0",
+    "0301-122/503/0/0",
+    "0301-122/509/0/0",
+    "0301-124/311/0/0",
+    "0301-126/95/0/0",
+    "0301-126/96/0/0",
+    "0301-126/97/0/0",
+    "0301-127/11/0/0",
+    "0301-127/67/0/0"
+  ],
+  "ubebygde_ikke_veg": 3371,
+  "ubebygde_ikke_veg_m2": 35914184,
+  "med_planlagte_bygg": 309
+}
