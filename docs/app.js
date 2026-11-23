@@ -67,6 +67,10 @@
     return true;
   }
 
+  const MERKNAD = /areal|merkn|ajourf|k-bild|ikke målt|veigrunn|uregistrert|rettighet/i;
+  const erMerknad = (n) => !!n && MERKNAD.test(n);
+  const tittel = (p) => p.a || (p.n && !erMerknad(p.n) ? p.n : "Gnr/bnr " + visningsnavn(p));
+
   function planinnsynLenke(p) {
     const zoom = p.m2 < 5000 ? 8 : p.m2 < 50000 ? 6 : 4;
     return `https://od2.pbe.oslo.kommune.no/kart/#${p.pe},${p.pn},${zoom}`;
@@ -127,8 +131,8 @@
     if (p.dt) merknader.push("Teigen deles med andre matrikkelenheter, så areal og bygg kan gjelde flere eiendommer.");
     if (p.s) merknader.push("Kommunen eier seksjoner i eiendommen, ikke hele eiendommen.");
     return `<div class="popup">
-      <h3>${esc(p.a || p.n || "Gnr/bnr " + visningsnavn(p))}</h3>
-      <p class="under">Gnr/bnr ${esc(visningsnavn(p))}${p.a && p.n ? " · " + esc(p.n) : ""}</p>
+      <h3>${esc(tittel(p))}</h3>
+      <p class="under">Gnr/bnr ${esc(visningsnavn(p))}${p.n && tittel(p) !== p.n ? " · " + esc(p.n) : ""}</p>
       <dl>
         <dt>Bydel</dt><dd>${esc(p.b)}${p.bb ? " (beregnet)" : ""}</dd>
         <dt>Forvalter</dt><dd>${esc(forv)}</dd>
@@ -187,7 +191,7 @@
     ol.innerHTML = topp.map((f) => {
       const p = f.properties;
       return `<li><button type="button" data-id="${p.i}">
-        <span>${esc(p.a || p.n || "Gnr/bnr " + visningsnavn(p))}</span>
+        <span>${esc(tittel(p))}</span>
         <span class="areal">${m2(p.m2)}</span>
         <span class="sted">${esc(p.b)} · ${esc(FORVALTER[p.f].navn)}</span>
       </button></li>`;
