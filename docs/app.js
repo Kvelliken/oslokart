@@ -72,8 +72,7 @@
   const tittel = (p) => p.a || (p.n && !erMerknad(p.n) ? p.n : "Gnr/bnr " + visningsnavn(p));
 
   function planinnsynLenke(p) {
-    const zoom = p.m2 < 5000 ? 8 : p.m2 < 50000 ? 6 : 4;
-    return `https://od2.pbe.oslo.kommune.no/kart/#${p.pe},${p.pn},${zoom}`;
+    return `https://od2.pbe.oslo.kommune.no/kart/?mode=regv2,no_historisk_flyfoto,situasjon,text1&north=${p.pn}&east=${p.pe}`;
   }
 
   function eiendomsregisterLenke(p) {
