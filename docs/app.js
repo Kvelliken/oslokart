@@ -324,7 +324,7 @@
     let rader = "";
     let under = esc(p.u);
     if (p.f === "skole") {
-      rader = `<dt>Elever</dt><dd>${d.et != null ? fmt.format(d.et) : "Ikke oppgitt"}</dd>
+      rader = `<dt>Elever</dt><dd>${d.et != null ? fmt.format(d.et) : p.u.startsWith("Videregående") ? "Ikke i skoleregisteret" : "Ikke oppgitt"}</dd>
         ${d.aa != null ? `<dt>Ansatte</dt><dd>${fmt.format(d.aa)}</dd>` : ""}
         ${trinn(d) ? `<dt>Trinn</dt><dd>${trinn(d)}</dd>` : ""}
         <dt>Eier</dt><dd>${eierTekst(p)}</dd>`;

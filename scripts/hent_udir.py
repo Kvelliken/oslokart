@@ -40,12 +40,25 @@ def detaljer(base, orgnr):
     return [d for d in ThreadPoolExecutor(max_workers=6).map(lambda o: hent(f"{base}/enhet/{o}"), orgnr) if d]
 
 
+# Grov avgrensning av Oslo; utelukker f.eks. norske skoler i utlandet registrert i Oslo
+OSLO_BOKS = (59.80, 60.15, 10.45, 10.98)
+
+
 def koordinat(d):
     k = d.get("Koordinat") or {}
     lat, lon = k.get("Breddegrad"), k.get("Lengdegrad")
     if not lat or not lon:
         return None, None
+    s, n, v, o = OSLO_BOKS
+    if not (s <= lat <= n and v <= lon <= o):
+        return None, None
     return round(lat, 6), round(lon, 6)
+
+
+def er_undervisning(d):
+    """Primær næringskode innen undervisning (85.x). Utelukker eksamenskontorer o.l."""
+    koder = sorted(d.get("Naeringskoder") or [], key=lambda k: k.get("Prioritet") or 9)
+    return not koder or (koder[0].get("Kode") or "").startswith("85")
 
 
 def adresse(d):
@@ -98,7 +111,7 @@ def hent_skoler(sted):
     ut = []
     for d in detaljer(NSR, valgt):
         lat, lon = koordinat(d)
-        if lat is None:
+        if lat is None or not er_undervisning(d):
             continue
         ut.append({
             "o": d["Organisasjonsnummer"],
