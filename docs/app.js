@@ -360,6 +360,7 @@
       <p class="under">${under}</p>
       <dl>${rader}${adresse}${p.b ? `<dt>Bydel</dt><dd>${esc(p.b)}</dd>` : ""}</dl>
       ${eiendomLinje(p)}
+      ${window.Dekning && tilstand.modus === "dekning" ? window.Dekning.punktInfo(p) : ""}
       ${nett}
       <p class="kilde">Kilde: ${esc(kilde)}</p>`;
   }
@@ -558,7 +559,13 @@
   function oppdaterPunkter() {
     tegnPunkter();
     oppdaterAntall();
+    if (window.Dekning) window.Dekning.oppdater();
     lagTegnforklaring();
+  }
+
+  // Anlegg som inngår i dekningsberegningen: formålsvalg og eierfilter, men ikke bydel eller søk
+  function anleggForDekning() {
+    return punkter.filter((p) => tilstand.valgt.has(bladNokkel(p)) && tilstand.eiere.has(p.ei) && (!tilstand.kunKommunal || p.e));
   }
 
   // ---------- Panel ----------
@@ -609,6 +616,11 @@
     document.querySelectorAll(".kun-alle").forEach((el) => { el.hidden = tilstand.modus !== "alle"; });
     document.querySelectorAll(".kun-eiendom").forEach((el) => { el.hidden = tilstand.modus === "dekning"; });
     document.querySelectorAll(".kun-dekning").forEach((el) => { el.hidden = tilstand.modus !== "dekning"; });
+    if (tilstand.modus === "dekning" && !tilstand.formal) {
+      const k = document.getElementById("lag-formal");
+      if (k) { k.checked = true; tilstand.formal = true; document.getElementById("formal-innhold").hidden = false; }
+    }
+    if (window.Dekning) window.Dekning.modus(tilstand.modus === "dekning");
     oppdaterPunkter();
   }
 
@@ -630,6 +642,7 @@
       const formal = FORMAL_REKKEFOLGE.filter((f) => vist.has(f));
       if (formal.length) html += `<p class="tf-tittel">Formål og anlegg</p>` + formal.map((f) => sirkel(FORMAL[f].farge, FORMAL[f].navn)).join("");
     }
+    if (window.Dekning && tilstand.modus === "dekning") html = window.Dekning.tegnforklaring() + html;
     el.innerHTML = html;
     el.hidden = !html;
   }
@@ -734,6 +747,13 @@
       });
       koble();
       lagKartlagPanel();
+      // Felles grensesnitt for tilleggsmoduler (dekningsgrad og senere kartlag)
+      window.Oslokart = {
+        kart, tilstand, FORMAL, FARGE, esc, fmt, punkter,
+        anleggForDekning, punktPopup: (p) => visPunktPopup(L.latLng(p.lat, p.lon), p),
+        oppdaterTegnforklaring: lagTegnforklaring
+      };
+      if (window.Dekning) window.Dekning.start(window.Oslokart);
       oppdater();
     })
     .catch(() => {

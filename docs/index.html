@@ -6,7 +6,7 @@
 <title>Kommunale tomter i Oslo</title>
 <meta name="description" content="Kart over eiendommer Oslo kommune eier, koblet mot matrikkelen. Finn ubebygde tomter og slå opp regulering i Planinnsyn.">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <div class="app">
@@ -29,7 +29,45 @@
 
     <section class="dekning kun-dekning" hidden>
       <h2>Dekningsgrad</h2>
-      <p>Denne fanen er under arbeid. Kartlagene under kan brukes i mellomtiden.</p>
+      <p class="dk-status" id="dk-status">Laster grunnlaget …</p>
+      <div id="dk-innhold" hidden>
+        <p class="dk-utvalg" id="dk-utvalg"></p>
+
+        <div class="rad">
+          <label class="felt"><span>Vis per</span>
+            <select id="dk-niva">
+              <option value="grunnkrets">Grunnkrets</option>
+              <option value="delbydel" selected>Delbydel</option>
+              <option value="bydel">Bydel</option>
+            </select>
+          </label>
+          <label class="felt"><span>Mål</span>
+            <select id="dk-maal">
+              <option value="innen">Andel innen gangavstand</option>
+              <option value="kapasitet">Kapasitet</option>
+              <option value="avstand">Gjennomsnittlig gangavstand</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="felt" id="dk-avstand-felt"><span>Gangavstand: <output id="dk-avstand-verdi">1 000 m</output></span>
+          <input type="range" id="dk-avstand" min="100" max="3000" step="100" value="1000">
+        </label>
+
+        <div class="dk-resultat" id="dk-resultat" aria-live="polite"></div>
+
+        <details class="dk-andeler" id="dk-andeler">
+          <summary>Brukergruppe: andel av hver aldersgruppe</summary>
+          <p class="lagmerknad" id="dk-andeler-tekst"></p>
+          <div class="dk-andel-tabell" id="dk-andel-tabell"></div>
+          <button type="button" class="lenkeknapp" id="dk-tilbakestill">Tilbakestill til forslag</button>
+        </details>
+
+        <h3 class="dk-liste-tittel" id="dk-liste-tittel">Lavest dekning</h3>
+        <ol class="dk-liste" id="dk-liste"></ol>
+
+        <p class="lagmerknad" id="dk-kilde"></p>
+      </div>
     </section>
 
     <section class="filter kun-eiendom">
@@ -105,6 +143,7 @@
 </div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="app.js?v=5"></script>
+<script src="dekning.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

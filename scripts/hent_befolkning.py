@@ -10,6 +10,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,7 @@ def sporring(tabell, utvalg):
                        "response": {"format": "json-stat2"}}).encode()
     for i in range(4):
         try:
-            req = Request(f"{API}/{tabell}", data=body, headers={"Content-Type": "application/json"})
+            req = Request(f"{API}/{quote(tabell)}", data=body, headers={"Content-Type": "application/json"})
             with urlopen(req, timeout=120) as r:
                 return json.load(r)
         except Exception as e:  # noqa: BLE001

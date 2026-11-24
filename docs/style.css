@@ -200,3 +200,29 @@ a { color: var(--mork-bla); }
 .dekning p { margin: 0; font-size: 15px; }
 .faner { padding: 0 16px; }
 .fane { padding: 10px 9px; font-size: 14px; white-space: nowrap; }
+
+/* Dekningsgrad */
+.dekning .rad { gap: 12px; }
+.dekning .felt { margin-bottom: var(--luft-2); }
+.dekning input[type="range"] { width: 100%; accent-color: var(--mork-bla); }
+.dk-status, .dk-utvalg { font-size: 15px; margin: 0 0 var(--luft-1); }
+.dk-resultat .nokkeltall { padding: 0; margin-bottom: var(--luft-2); }
+.dk-andeler { margin: var(--luft-1) 0; border-top: 1px solid var(--mork-beige); padding-top: var(--luft-2); }
+.dk-andeler summary { cursor: pointer; font-size: 15px; margin-bottom: var(--luft-2); }
+.dk-andel-tabell { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: var(--luft-2); }
+.dk-andel { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.dk-andel span { flex: 1; }
+.dk-andel input { width: 58px; font: inherit; font-size: 14px; padding: 3px 4px; border: 1px solid var(--svart); border-radius: 0; }
+.dk-andel input:disabled { background: var(--flate-alt); }
+.dk-faktisk { grid-column: 1 / -1; font-size: 13px; }
+.dk-liste-tittel { font-size: 16px; font-weight: 400; margin: var(--luft-1) 0 var(--luft-2); }
+.dk-liste { list-style: none; margin: 0 0 var(--luft-1); padding: 0; }
+.dk-liste li button {
+  width: 100%; text-align: left; font: inherit; font-size: 14px;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+  background: none; border: 0; border-bottom: 1px solid var(--flate-alt);
+  padding: 6px 0; cursor: pointer; color: var(--tekst);
+}
+.dk-liste li button:hover { background: var(--flate-alt); }
+.dk-liste .sted { grid-column: 1 / -1; font-size: 12px; }
+.dk-liste .areal { text-align: right; }
