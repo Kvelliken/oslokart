@@ -8,6 +8,7 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 
 ## Hva kartet viser
 
+- **Faner:** «Alle eiendommer» (startvisning), «Ubebygde tomter» og «Dekningsgrad» (under arbeid).
 - **Ubebygde tomter.** Kommunale eiendommer uten registrerte bygninger. Veigrunn og seksjoner er utelatt. Som standard utelates også Marka, uregistrert grunn og tomter med byggesak under arbeid. Alle tre kan slås på i filteret, og du kan velge å tillate garasjer, uthus og naust.
 - **Alle eiendommer.** Alle kommunale eiendommer, farget etter forvalter.
 - **Filtre:** forvalter, bydel, minste areal og søk på adresse eller gnr/bnr.
@@ -17,7 +18,7 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 
 ### Kartlaget «Formål og anlegg»
 
-Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. Hvert hovedformål har sin farge, og eiendomsflatene tones ned når laget er slått på.
+Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. Ingen formål er valgt når laget slås på. Du velger det du vil se, eller søker etter en anleggstype (for eksempel «bandy») og huker av treffet. «Velg alle» og «Fjern alle» finnes også. Hvert hovedformål har sin farge, og eiendomsflatene tones ned når laget er slått på.
 
 | Hovedformål | Kilde | Underfilter |
 |---|---|---|

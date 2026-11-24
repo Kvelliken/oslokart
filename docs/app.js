@@ -52,10 +52,10 @@
     .replace(/ (Kommune|Kf|As|Og|I)\b/g, (m) => (m === " Kf" || m === " As" ? m.toUpperCase() : m.toLowerCase()));
 
   const tilstand = {
-    modus: "tomter",
+    modus: "alle",
     sok: "",
     bydel: "",
-    minareal: 1000,
+    minareal: 0,
     forvaltere: new Set(FORVALTER_REKKEFOLGE),
     smaabygg: false,
     planlagt: false,
@@ -64,7 +64,7 @@
     fargelegging: "forvalter",
     // Kartlaget «Formål og anlegg»
     formal: false,
-    skjult: new Set(),          // nøkler: "idrett", "idrett|Fotballanlegg", "idrett|Fotballanlegg|Grusbane"
+    valgt: new Set(),           // valgte blader: "skole|Barneskole", "idrett|Fotballanlegg|Fotballbane grus"
     eiere: new Set(["K", "S", "P"]),
     kunKommunal: false
   };
@@ -255,6 +255,13 @@
     return ut;
   }
 
+  function bladNokkel(p) {
+    return p.f === "idrett" ? p.f + "|" + p.u + "|" + p.t : p.f + "|" + p.u;
+  }
+
+  let alleBlader = [];
+  const bladerUnder = (nokkel) => alleBlader.filter((b) => b === nokkel || b.startsWith(nokkel + "|"));
+
   function punktNokler(p) {
     const k = [p.f, p.f + "|" + p.u];
     if (p.f === "idrett") k.push(p.f + "|" + p.u + "|" + p.t);
@@ -277,7 +284,7 @@
   function tegnPunkter() {
     if (punktlag) { kart.removeLayer(punktlag); punktlag = null; }
     if (!tilstand.formal) { synligePunkter = []; return; }
-    synligePunkter = punkter.filter((p) => passerPunktGrunnfilter(p) && !punktNokler(p).some((k) => tilstand.skjult.has(k)));
+    synligePunkter = punkter.filter((p) => tilstand.valgt.has(bladNokkel(p)) && passerPunktGrunnfilter(p));
     const r = radius();
     punktlag = L.layerGroup();
     TEGNEREKKEFOLGE.forEach((f) => {
@@ -413,11 +420,11 @@
 
   function radHtml(nokkel, tekst, farge, harBarn, niva) {
     const id = "fm-" + nokkel.replace(/[^a-zA-Z0-9]/g, "_") + "-" + Math.random().toString(36).slice(2, 7);
-    return `<div class="tre-rad niva-${niva}">
+    return `<div class="tre-rad niva-${niva}" data-rad="${esc(nokkel)}">
       ${harBarn ? `<button type="button" class="utvid" aria-expanded="false" aria-controls="${id}" title="Vis underkategorier"><span aria-hidden="true">›</span><span class="skjult-tekst">Vis underkategorier for ${esc(tekst)}</span></button>` : `<span class="utvid-plass"></span>`}
-      <label class="avkryss"><input type="checkbox" data-nokkel="${esc(nokkel)}" ${tilstand.skjult.has(nokkel) ? "" : "checked"}>
+      <label class="avkryss"><input type="checkbox" data-nokkel="${esc(nokkel)}">
         ${farge ? `<span class="sirkel" style="background:${farge}"></span>` : ""}<span class="tre-tekst">${esc(tekst)}</span> <span class="antall" data-antall="${esc(nokkel)}"></span></label>
-    </div>${harBarn ? `<div class="tre-barn" id="${id}" hidden>` : ""}`;
+    </div>${harBarn ? `<div class="tre-barn" id="${id}" data-barn-for="${esc(nokkel)}" hidden>` : ""}`;
   }
 
   function lagKartlagPanel() {
@@ -431,7 +438,13 @@
         ${Object.entries(EIER).map(([k, v]) => `<label class="avkryss"><input type="checkbox" data-eier="${k}" checked> ${v}</label>`).join("")}
       </div>
       <label class="avkryss"><input type="checkbox" id="kun-kommunal"> Bare anlegg på kommunal eiendom</label></fieldset>
-      <fieldset class="felt"><legend>Formål</legend><div class="tre">`;
+      <fieldset class="felt"><legend>Formål</legend>
+      <label class="felt formal-sok"><span>Finn formål eller anleggstype</span>
+        <input type="search" id="formal-sok" placeholder="F.eks. bandy, sykehjem, barneskole" autocomplete="off"></label>
+      <div class="velg-knapper"><button type="button" class="lenkeknapp" id="velg-alle">Velg alle</button>
+        <button type="button" class="lenkeknapp" id="velg-ingen">Fjern alle</button></div>
+      <p class="lagmerknad" id="formal-tomt">Ingen formål er valgt. Velg formål under for å vise dem i kartet.</p>
+      <div class="tre">`;
     tilgjengelig.forEach((f) => {
       const under = Object.keys(tre[f]).sort((a, b) => a.localeCompare(b, "nb"));
       html += radHtml(f, FORMAL[f].navn, FORMAL[f].farge, under.length > 0, 1);
@@ -452,6 +465,8 @@
       <button type="button" id="last-ned-anlegg" class="lenkeknapp">Last ned anleggene som CSV</button>
       </div>`;
     rot.innerHTML = html;
+    alleBlader = [...new Set(punkter.map(bladNokkel))];
+    oppdaterAvkrysning();
 
     document.getElementById("lag-formal").addEventListener("change", (e) => {
       tilstand.formal = e.target.checked;
@@ -468,7 +483,10 @@
     rot.addEventListener("change", (e) => {
       const t = e.target;
       if (t.dataset.nokkel) {
-        if (t.checked) tilstand.skjult.delete(t.dataset.nokkel); else tilstand.skjult.add(t.dataset.nokkel);
+        const blader = bladerUnder(t.dataset.nokkel);
+        const alleValgt = blader.every((b) => tilstand.valgt.has(b));
+        blader.forEach((b) => (alleValgt ? tilstand.valgt.delete(b) : tilstand.valgt.add(b)));
+        oppdaterAvkrysning();
         oppdaterPunkter();
       } else if (t.dataset.eier) {
         if (t.checked) tilstand.eiere.add(t.dataset.eier); else tilstand.eiere.delete(t.dataset.eier);
@@ -479,6 +497,50 @@
       }
     });
     document.getElementById("last-ned-anlegg").addEventListener("click", lastNedAnleggCsv);
+    document.getElementById("velg-alle").addEventListener("click", () => {
+      alleBlader.forEach((b) => tilstand.valgt.add(b)); oppdaterAvkrysning(); oppdaterPunkter();
+    });
+    document.getElementById("velg-ingen").addEventListener("click", () => {
+      tilstand.valgt.clear(); oppdaterAvkrysning(); oppdaterPunkter();
+    });
+    let ts;
+    document.getElementById("formal-sok").addEventListener("input", (e) => {
+      clearTimeout(ts);
+      ts = setTimeout(() => sokITre(e.target.value.trim().toLowerCase()), 150);
+    });
+  }
+
+  // Avkrysning: huket av når alle blader under er valgt, delvis når noen er valgt
+  function oppdaterAvkrysning() {
+    document.querySelectorAll("#kartlag input[data-nokkel]").forEach((el) => {
+      const blader = bladerUnder(el.dataset.nokkel);
+      const n = blader.filter((b) => tilstand.valgt.has(b)).length;
+      el.checked = n > 0 && n === blader.length;
+      el.indeterminate = n > 0 && n < blader.length;
+    });
+    const tomt = document.getElementById("formal-tomt");
+    if (tomt) tomt.hidden = tilstand.valgt.size > 0;
+  }
+
+  // Søk i formålstreet: viser treff, deres overordnede og underordnede rader
+  function sokITre(q) {
+    const rader = [...document.querySelectorAll("#kartlag .tre-rad")];
+    const beholdere = [...document.querySelectorAll("#kartlag .tre-barn")];
+    if (!q) {
+      rader.forEach((r) => { r.hidden = false; });
+      beholdere.forEach((b) => {
+        const knapp = document.querySelector(`[aria-controls="${b.id}"]`);
+        b.hidden = !knapp || knapp.getAttribute("aria-expanded") !== "true";
+      });
+      return;
+    }
+    const treff = rader.filter((r) => r.querySelector(".tre-tekst").textContent.toLowerCase().includes(q)).map((r) => r.dataset.rad);
+    const synlig = (k) => treff.some((t) => t === k || t.startsWith(k + "|") || k.startsWith(t + "|"));
+    rader.forEach((r) => { r.hidden = !synlig(r.dataset.rad); });
+    beholdere.forEach((b) => {
+      const k = b.dataset.barnFor;
+      b.hidden = !treff.some((t) => t.startsWith(k + "|"));
+    });
   }
 
   function oppdaterAntall() {
@@ -535,7 +597,7 @@
   }
 
   function oppdater() {
-    utvalg = data.filter((f) => {
+    utvalg = tilstand.modus === "dekning" ? [] : data.filter((f) => {
       const p = f.properties;
       if (!passerFellesFilter(p)) return false;
       return tilstand.modus === "tomter" ? erUbebygd(p) : true;
@@ -545,6 +607,8 @@
     oppdaterListe();
     document.querySelectorAll(".kun-tomter").forEach((el) => { el.hidden = tilstand.modus !== "tomter"; });
     document.querySelectorAll(".kun-alle").forEach((el) => { el.hidden = tilstand.modus !== "alle"; });
+    document.querySelectorAll(".kun-eiendom").forEach((el) => { el.hidden = tilstand.modus === "dekning"; });
+    document.querySelectorAll(".kun-dekning").forEach((el) => { el.hidden = tilstand.modus !== "dekning"; });
     oppdaterPunkter();
   }
 
@@ -556,7 +620,7 @@
     if (tilstand.modus === "alle" && tilstand.fargelegging === "hovedbruk") {
       html += `<p class="tf-tittel">Eiendommer etter hovedbruk</p>` +
         Object.values(HOVEDBRUK).map((h) => rute(h.farge, h.navn)).join("");
-    } else {
+    } else if (tilstand.modus !== "dekning") {
       html += `<p class="tf-tittel">Eiendommer etter forvalter</p>` +
         FORVALTER_REKKEFOLGE.map((k) => rute(FORVALTER[k].farge, FORVALTER[k].navn)).join("");
       if (tilstand.modus === "tomter") html += rute(FARGE.morkBeige, "Annen kommunal eiendom", FARGE.morkBeige);
@@ -567,6 +631,7 @@
       if (formal.length) html += `<p class="tf-tittel">Formål og anlegg</p>` + formal.map((f) => sirkel(FORMAL[f].farge, FORMAL[f].navn)).join("");
     }
     el.innerHTML = html;
+    el.hidden = !html;
   }
 
   function csv(hode, rader, filnavn) {
@@ -626,12 +691,13 @@
       document.getElementById(id).addEventListener("change", (e) => { tilstand[id] = e.target.checked; oppdater(); });
     });
 
-    const faner = { tomter: document.getElementById("fane-tomter"), alle: document.getElementById("fane-alle") };
+    const faner = { alle: document.getElementById("fane-alle"), tomter: document.getElementById("fane-tomter"), dekning: document.getElementById("fane-dekning") };
     Object.entries(faner).forEach(([modus, knapp]) => {
       knapp.addEventListener("click", () => {
         tilstand.modus = modus;
         Object.entries(faner).forEach(([m, k]) => { k.classList.toggle("aktiv", m === modus); k.setAttribute("aria-selected", m === modus); });
         if (modus === "alle" && tilstand.minareal === 1000) { tilstand.minareal = 0; document.getElementById("minareal").value = "0"; }
+        if (modus === "tomter" && tilstand.minareal === 0) { tilstand.minareal = 1000; document.getElementById("minareal").value = "1000"; }
         oppdater();
       });
     });
@@ -655,7 +721,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=4`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=5`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);

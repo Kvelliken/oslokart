@@ -192,3 +192,11 @@ a { color: var(--mork-bla); }
 .popup ul.anleggsliste .under { display: block; margin: 0 0 0 18px; font-size: 12px; }
 .popup .tilbake { display: block; margin-bottom: var(--luft-2); }
 .popup .lenkeknapp { text-align: left; }
+
+.formal-sok { margin-bottom: var(--luft-2); }
+.velg-knapper { display: flex; gap: var(--luft-1); margin-bottom: var(--luft-2); }
+.dekning { padding: var(--luft-1) var(--marg); }
+.dekning h2 { margin-bottom: var(--luft-2); }
+.dekning p { margin: 0; font-size: 15px; }
+.faner { padding: 0 16px; }
+.fane { padding: 10px 9px; font-size: 14px; white-space: nowrap; }
