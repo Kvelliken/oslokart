@@ -13,6 +13,26 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 - **Filtre:** forvalter, bydel, minste areal og søk på adresse eller gnr/bnr.
 - **Lenker per eiendom** til Planinnsyn, som viser regulering, kommuneplan og pågående saker, og til Eiendomsregisteret.
 - **Nedlasting** av utvalget som CSV-fil.
+- **Farg etter hovedbruk:** I fanen «Alle eiendommer» kan eiendommene farges etter hvilke bygg som står på tomten (skole, barnehage, idrett, helse og så videre). Popup-vinduet viser byggene på tomten.
+
+### Kartlaget «Formål og anlegg»
+
+Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. Hvert hovedformål har sin farge, og eiendomsflatene tones ned når laget er slått på.
+
+| Hovedformål | Kilde | Underfilter |
+|---|---|---|
+| Skole | Udir, Nasjonalt skoleregister (NSR) | Skoletype (barneskole, ungdomsskole, videregående osv.) |
+| Barnehage | Udir, Nasjonalt barnehageregister (NBR) | Type (ordinær, familiebarnehage, åpen osv.) |
+| Idrett | Anleggsregisteret (idrettsanlegg.no) | Anleggskategori og videre anleggstype |
+| Helse og omsorg | Matrikkelen, bygningstype | Sykehjem, helsesenter, annet |
+| Kultur og religion | Matrikkelen, bygningstype | Museum og bibliotek, kulturhus, kirke |
+| Beredskap | Matrikkelen, bygningstype | Brann og ambulanse, politi, annet |
+
+- **Eierfilter:** kommunal, statlig og privat. Du kan også velge å vise bare anlegg som ligger på kommunal eiendom.
+- **Popup:** Skoler viser elevtall, antall ansatte og trinn. Barnehager viser antall barn, ansatte og alder. Idrettsanlegg viser kategori, type, eier, drifter og byggeår. Ligger anlegget på en kommunal eiendom, kan du gå direkte til eiendommen.
+- **Anlegg på samme sted:** Når flere anlegg ligger oppå hverandre, viser popup-vinduet en liste.
+- **Idrettsanleggene er ikke komplette.** Uttrekket fra Anleggsregisteret dekker ikke alle idrettsanlegg i Oslo. 54 anlegg har en felles standardplassering i registeret og vises ikke i kartet.
+- **Helse, kultur og beredskap** bygger på bygningstypen i matrikkelen og gjelder bare bygg på kommunale eiendommer. Bygningstypen kan være utdatert hvis bygget har endret bruk.
 
 ## Kilder
 
@@ -22,6 +42,9 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 | Matrikkelen – Eiendomskart Teig, 0301 Oslo | Kartverket via Geonorge | CC BY 4.0 |
 | Matrikkelen – Bygning, 0301 Oslo | Kartverket via Geonorge | CC BY 4.0 |
 | Bakgrunnskart (topografisk gråtone) | Kartverket | CC BY 4.0 |
+| Skoler (navn, elevtall, trinn) | [Udir, Nasjonalt skoleregister](https://data-nsr.udir.no/swagger/index.html) | NLOD |
+| Barnehager (navn, antall barn) | [Udir, Nasjonalt barnehageregister](https://data-nbr.udir.no/swagger/index.html) | NLOD |
+| Idrettsanlegg, uttrekk for Oslo | Anleggsregisteret (idrettsanlegg.no) | Ikke komplett |
 | Bydelsgrenser (forenklede) | Oslo kommune, [bydelsfakta](https://github.com/oslokommune/bydelsfakta) | MIT |
 | Kartbibliotek | [Leaflet 1.9.4](https://leafletjs.com/) | BSD-2 |
 
@@ -62,7 +85,11 @@ python scripts/bygg_data.py \
   --bygning data/raw/Basisdata_0301_Oslo_25833_MatrikkelenBygning_FGDB.gdb
 ```
 
-Skriptet skriver `docs/data/eiendommer.geojson` og `docs/data/statistikk.json`. Siden publiseres fra mappen `docs/` med GitHub Pages.
+Skriptet skriver `docs/data/eiendommer.geojson`, `docs/data/bygg_formal.json` og `docs/data/statistikk.json`. Siden publiseres fra mappen `docs/` med GitHub Pages.
+
+**Idrettsanlegg:** Legg et nytt uttrekk i `data/idrettsanlegg.xlsx` og kjør `python scripts/bygg_idrett.py`.
+
+**Skoler og barnehager** hentes automatisk hver mandag av GitHub Actions (`.github/workflows/udir.yml`). Du kan også kjøre jobben selv under *Actions → Hent skoler og barnehager fra Udir → Run workflow*, eller lokalt med `python scripts/hent_udir.py`.
 
 ## Mappestruktur
 
@@ -71,6 +98,10 @@ docs/                 nettsiden (GitHub Pages)
   index.html, app.js, style.css
   data/               eiendommer.geojson, statistikk.json
   vendor/leaflet/     Leaflet 1.9.4
-scripts/bygg_data.py  kobling og bearbeiding
-data/                 eiendomsoversikt (Excel) og bydelsgrenser
+  data/               skoler.json, barnehager.json, idrett.json, bygg_formal.json
+scripts/bygg_data.py  kobling og bearbeiding av eiendommer og bygg
+scripts/bygg_idrett.py  idrettsanlegg
+scripts/hent_udir.py  skoler og barnehager fra Udir (kjøres av GitHub Actions)
+scripts/geo.py, ns3457.py  felles oppslag og bygningstyper
+data/                 eiendomsoversikt og idrettsanlegg (Excel), bydelsgrenser
 ```

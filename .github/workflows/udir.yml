@@ -1,0 +1,57 @@
+name: Hent skoler og barnehager fra Udir
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"   # mandager kl. 03:17 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/hent_udir.py
+      - scripts/geo.py
+      - .github/workflows/udir.yml
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: udir
+  cancel-in-progress: false
+
+jobs:
+  hent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer avhengigheter
+        run: pip install shapely numpy
+
+      - name: Hent data fra NSR og NBR
+        run: python scripts/hent_udir.py
+
+      - name: Lagre endringer
+        id: lagre
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/skoler.json docs/data/barnehager.json
+          if git diff --cached --quiet; then
+            echo "Ingen endringer i Udir-dataene."
+            echo "endret=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Oppdater skoler og barnehager fra Udir ($(date +%F))"
+            git push
+            echo "endret=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bygg GitHub Pages på nytt
+        if: steps.lagre.outputs.endret == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages-bygg ble ikke startet, siden oppdateres ved neste push."

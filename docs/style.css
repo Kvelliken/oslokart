@@ -150,3 +150,45 @@ a { color: var(--mork-bla); }
   .leaflet-top.leaflet-left { top: 52px; }
 }
 [hidden] { display: none !important; }
+
+/* Kartlag */
+.kartlag { padding: var(--luft-2) var(--marg) var(--luft-1); border-top: 1px solid var(--mork-beige); }
+.kartlag h2 { margin: var(--luft-2) 0; }
+.lagvalg { font-size: 16px; }
+.lag-innhold { margin-top: var(--luft-2); padding-left: 4px; }
+.lagmerknad { font-size: 12px; margin: 0 0 var(--luft-2); }
+.tre { display: flex; flex-direction: column; }
+.tre-rad { display: flex; align-items: flex-start; gap: 2px; }
+.tre-rad .avkryss { margin-bottom: 4px; font-size: 14px; flex: 1; }
+.tre-rad.niva-1 .avkryss { font-size: 15px; }
+.tre-barn { padding-left: 22px; }
+.utvid, .utvid-plass { flex: 0 0 22px; width: 22px; height: 22px; }
+.utvid {
+  font: inherit; font-size: 18px; line-height: 1; background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--tekst); transition: transform .15s;
+}
+.utvid[aria-expanded="true"] { transform: rotate(90deg); }
+.antall { color: var(--tekst); font-size: 12px; }
+.sirkel {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--svart);
+  margin-right: 6px; vertical-align: -1px; flex: 0 0 12px;
+}
+.skjult-tekst { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Tegnforklaring */
+.tf-tittel { margin: 6px 0 2px; font-size: 12px; }
+.tf-tittel:first-child { margin-top: 0; }
+.tegnforklaring i.rund { border-radius: 50%; width: 12px; height: 12px; margin: 0 1px; }
+.tegnforklaring { max-height: 60vh; overflow-y: auto; }
+
+/* Popup for anlegg og eiendom */
+.popup h3 .sirkel { vertical-align: 1px; }
+.popup .kilde { font-size: 12px; margin: var(--luft-2) 0 0; }
+.popup .eiendom { margin: 0 0 var(--luft-2); }
+.popup .mellomtittel { margin: 0 0 2px; }
+.popup ul.bygg { margin: 0 0 var(--luft-2); padding-left: 18px; }
+.popup ul.anleggsliste { list-style: none; margin: 0; padding: 0; }
+.popup ul.anleggsliste li { padding: 4px 0; border-bottom: 1px solid var(--flate-alt); }
+.popup ul.anleggsliste .under { display: block; margin: 0 0 0 18px; font-size: 12px; }
+.popup .tilbake { display: block; margin-bottom: var(--luft-2); }
+.popup .lenkeknapp { text-align: left; }

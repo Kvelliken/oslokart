@@ -21,6 +21,8 @@ import pyogrio
 from shapely import set_precision
 from shapely.geometry import mapping
 
+from ns3457 import formal_punkt, hovedbruk, navn as byggnavn
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "data"
 
@@ -137,6 +139,26 @@ def main():
     eks_store["kat"] = (eks_store.bygningstype // 100).map(BYGGKATEGORI).fillna("Annet")
     hovedkat = eks_store.groupby("eiendom")["kat"].agg(lambda s: s.value_counts().index[0])
 
+    # Hovedbruk per eiendom (uten småbygg og ukjent type) og liste over bygg
+    kjent = eks_store[eks_store.bygningstype != 999].copy()
+    kjent["hb"] = kjent.bygningstype.map(hovedbruk)
+    hb = kjent.groupby("eiendom")["hb"].agg(lambda s: s.value_counts().index[0])
+    eks_n = eks.assign(nv=eks.bygningstype.map(byggnavn))
+    byggliste = (eks_n.groupby(["eiendom", "nv"]).size().reset_index(name="n")
+                 .sort_values(["eiendom", "n"], ascending=[True, False])
+                 .groupby("eiendom").apply(lambda g: [[a, int(b)] for a, b in zip(g.nv, g.n)][:8]))
+
+    # Punkter for helse, kultur og beredskap (bygg på kommunal eiendom)
+    fp = eks.assign(fp=eks.bygningstype.map(formal_punkt)).dropna(subset=["fp"])
+    fp = fp.assign(x=fp.geometry.x, y=fp.geometry.y)
+    fpg = fp.groupby(["eiendom", "bygningstype"]).agg(x=("x", "mean"), y=("y", "mean"), n=("x", "size")).reset_index()
+    fpg_pt = gpd.GeoSeries(gpd.points_from_xy(fpg.x, fpg.y), crs=teig.crs).to_crs(4326)
+    formal_bygg = []
+    for r, pt in zip(fpg.itertuples(), fpg_pt):
+        f, u = formal_punkt(r.bygningstype)
+        formal_bygg.append({"f": f, "u": u, "t": byggnavn(r.bygningstype), "n": int(r.n),
+                            "e": r.eiendom.replace("0301-", ""), "lat": round(pt.y, 6), "lon": round(pt.x, 6)})
+
     # Slå sammen teiger per eiendom
     tg["delt"] = tg["teigmedflerematrikkelenheter"].astype(int)
     geo = tg.dissolve(by="eiendom", aggfunc={"delt": "max"}).reset_index()
@@ -150,6 +172,8 @@ def main():
     d["n_store"] = d.eiendom.map(n_store).fillna(0).astype(int)
     d["n_planl"] = d.eiendom.map(n_planl).fillna(0).astype(int)
     d["hovedkat"] = d.eiendom.map(hovedkat)
+    d["hb"] = d.eiendom.map(hb)
+    d["bt"] = d.eiendom.map(byggliste)
 
     # Bydel: fra Excel, ellers beregnet fra bydelsgrenser
     rp = d.geometry.representative_point()
@@ -187,6 +211,8 @@ def main():
             "ns": r.n_store,
             "np": r.n_planl,
             "k": None if pd.isna(r.hovedkat) else r.hovedkat,
+            "hb": None if pd.isna(r.hb) else r.hb,
+            "bt": r.bt if isinstance(r.bt, list) else [],
             "fu": int(r.forurenset or 0),
             "km": int(r.kulturminne or 0),
             "dt": int(r.delt),
@@ -199,6 +225,10 @@ def main():
     with open(OUT / "eiendommer.geojson", "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": feats}, f,
                   ensure_ascii=False, separators=(",", ":"))
+
+    with open(OUT / "bygg_formal.json", "w", encoding="utf-8") as f:
+        json.dump({"kilde": "Kartverket, Matrikkelen - Bygning (CC BY 4.0)", "antall": len(formal_bygg),
+                   "poster": formal_bygg}, f, ensure_ascii=False, separators=(",", ":"))
 
     ubebygd = d[(d.n_bygg == 0) & (~d.veg) & (d.snr == 0)]
     stat = {
