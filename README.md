@@ -44,7 +44,7 @@ Fanen viser hvor godt de valgte formålene dekker brukergruppen, per delbydel el
 3. **Brukergruppe:** Brukere = befolkning i hver aldersgruppe × brukerandel. Andelene er forslag og kan endres i panelet. For barnehage brukes faktisk andel barn 1–5 år i barnehage per delbydel (UTD006).
 4. **Mål:** andel brukere innen valgt gangavstand, kapasitet (elevtall eller antall barnehagebarn per bruker i nedslagsfeltet, ellers anlegg per 1 000 brukere) og gjennomsnittlig gangavstand.
 
-Grunnlaget bygges månedlig av `.github/workflows/dekning.yml` (`hent_befolkning.py`, `hent_gangnett.py`, `bygg_dekning.py`). Boligene (`data/boliger.csv`) lages fra matrikkelen med `bygg_boliger.py`. Legg grunnkretsgrenser i `data/grunnkretser.geojson` (felt `kode`) for å få grunnkrets som minste nivå.
+Grunnlaget bygges månedlig av `.github/workflows/dekning.yml` (`hent_befolkning.py`, `hent_gangnett.py`, `bygg_dekning.py`). Boligene (`data/boliger.csv`) lages fra matrikkelen med `bygg_boliger.py`. Grunnkretsgrensene (`data/grunnkretser.geojson`) er fra Kartverket via Geonorge (2025). Hver grunnkrets knyttes til delbydelen den overlapper mest. Marka-kretsene (nummer 51xx, 58xx, 59xx og 60xx) og Sentrum-kretsene, som mangler i delbydelsgrensene, legges til Marka og Sentrum. Summen per delbydel stemmer da med statistikkbanken.
 
 **Forbehold:** Gangnettet tar ikke hensyn til stigning, og boenheter er en tilnærming for hvor folk bor. Kapasitet for skole bygger på elevtall i skoleregisteret, som mangler for de fleste videregående skolene.
 
@@ -61,6 +61,7 @@ Grunnlaget bygges månedlig av `.github/workflows/dekning.yml` (`hent_befolkning
 | Idrettsanlegg, uttrekk for Oslo | Anleggsregisteret (idrettsanlegg.no) | Ikke komplett |
 | Befolkning per grunnkrets og delbydel | Oslo kommune, statistikkbanken (grunnlag fra SSB) | Åpne data |
 | Gangnett | OpenStreetMap-bidragsytere | ODbL |
+| Grunnkretsgrenser, Oslo | Kartverket via Geonorge | CC BY 4.0 |
 | Delbydelsgrenser | Oslo kommune, [bydelsfakta](https://github.com/oslokommune/bydelsfakta) | MIT |
 | Bydelsgrenser (forenklede) | Oslo kommune, [bydelsfakta](https://github.com/oslokommune/bydelsfakta) | MIT |
 | Kartbibliotek | [Leaflet 1.9.4](https://leafletjs.com/) | BSD-2 |

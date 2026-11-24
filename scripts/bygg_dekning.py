@@ -37,6 +37,38 @@ def les_geojson(sti, crs=4326):
     return g
 
 
+MARKA_PREFIKS = ("51", "58", "59", "60")
+
+
+def delbydel_for_flater(gk, db, navn, maks_avstand=500):
+    """Delbydel for hver grunnkrets: størst overlapp med delbydelsgrensene.
+
+    De forenklede delbydelsgrensene dekker ikke alltid sjøkanten helt. Grunnkretser med
+    lite overlapp knyttes til nærmeste delbydel innen maks_avstand; ellers regnes de som Marka.
+    """
+    ov = gpd.overlay(gk[["kode", "geometry"]], db[["kode", "geometry"]].rename(columns={"kode": "db"}),
+                     how="intersection", keep_geom_type=True)
+    ov["a"] = ov.geometry.area
+    best = ov.sort_values("a").groupby("kode").last()
+    andel = best["a"] / gk.set_index("kode").geometry.area.reindex(best.index)
+    tildelt = best["db"][andel >= 0.2].to_dict()
+    # Marka (bydel 17) og Sentrum (bydel 16) mangler i delbydelsgrensene.
+    # Marka-kretsene har egne nummerserier; Sentrum-kretsene heter «Sentrum …».
+    for k in gk.kode:
+        if k.startswith(MARKA_PREFIKS):
+            tildelt[k] = "1701"
+        elif k not in tildelt and (navn.get(k) or "").startswith("Sentrum"):
+            tildelt[k] = "1601"
+    rest = gk[~gk.kode.isin(tildelt)]
+    if len(rest):
+        nj = gpd.sjoin_nearest(rest[["kode", "geometry"]], db[["kode", "geometry"]].rename(columns={"kode": "db"}),
+                               how="left", max_distance=maks_avstand)
+        nj = nj[~nj.kode.duplicated()]
+        for k, d in zip(nj.kode, nj.db):
+            tildelt[k] = d if isinstance(d, str) else "1701"
+    return gk.kode.map(tildelt).fillna("1701").values
+
+
 def main():
     bef = json.load(open(DATA / "befolkning.json", encoding="utf-8"))
     nett = json.load(open(DATA / "gangnett_raa.json"))
@@ -68,8 +100,7 @@ def main():
     if bruk_gk:
         gk = les_geojson(gk_fil)
         gk["kode"] = gk["kode"].astype(str).str[-4:]
-        rp = gk.geometry.representative_point()
-        gk["delbydel"] = delbydel_for(rp).values
+        gk["delbydel"] = delbydel_for_flater(gk, db, {k: v["navn"] for k, v in bef["grunnkretser"].items()})
     pkt = gpd.GeoSeries(gpd.points_from_xy(boliger.x, boliger.y), crs=25833)
     boliger["delbydel"] = delbydel_for(pkt).values
     if bruk_gk:
@@ -162,8 +193,19 @@ def main():
             json.dump({"type": "FeatureCollection", "features": feats}, f, ensure_ascii=False, separators=(",", ":"))
 
     db["kode"] = db["kode"].astype(str)
+    bd_ut = bd.assign(kode=bd.nr.astype(str))[["kode", "navn", "geometry"]]
+    if bruk_gk:
+        # Sentrum og Marka finnes ikke i grensefilene; lag dem av grunnkretsene
+        for dkode, bnr, navn in (("1601", "16", "Sentrum"), ("1701", "17", "Marka")):
+            flate = gk[gk.delbydel == dkode].geometry.union_all()
+            if flate.is_empty:
+                continue
+            ny = gpd.GeoDataFrame({"kode": [dkode], "navn": [navn]}, geometry=[flate], crs=25833)
+            db = pd.concat([db[db.kode != dkode], ny], ignore_index=True)
+            if bnr not in set(bd_ut.kode):
+                bd_ut = pd.concat([bd_ut, ny.assign(kode=bnr)], ignore_index=True)
     skriv_grenser(db, "delbydel", ["kode", "navn"])
-    skriv_grenser(bd.assign(kode=bd.nr.astype(str)), "bydel", ["kode", "navn"])
+    skriv_grenser(bd_ut, "bydel", ["kode", "navn"])
     if bruk_gk:
         gk["navn"] = gk.kode.map(lambda k: bef["grunnkretser"].get(k, {}).get("navn", k))
         skriv_grenser(gk, "grunnkrets", ["kode", "navn"])
