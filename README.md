@@ -8,7 +8,7 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 
 ## Hva kartet viser
 
-- **Faner:** «Alle eiendommer» (startvisning), «Ubebygde tomter» og «Dekningsgrad» (under arbeid).
+- **Faner:** «Alle eiendommer» (startvisning), «Ubebygde tomter» og «Dekningsgrad».
 - **Ubebygde tomter.** Kommunale eiendommer uten registrerte bygninger. Veigrunn og seksjoner er utelatt. Som standard utelates også Marka, uregistrert grunn og tomter med byggesak under arbeid. Alle tre kan slås på i filteret, og du kan velge å tillate garasjer, uthus og naust.
 - **Alle eiendommer.** Alle kommunale eiendommer, farget etter forvalter.
 - **Filtre:** forvalter, bydel, minste areal og søk på adresse eller gnr/bnr.
@@ -35,6 +35,19 @@ Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. 
 - **Idrettsanleggene er ikke komplette.** Uttrekket fra Anleggsregisteret dekker ikke alle idrettsanlegg i Oslo. 54 anlegg har en felles standardplassering i registeret og vises ikke i kartet.
 - **Helse, kultur og beredskap** bygger på bygningstypen i matrikkelen og gjelder bare bygg på kommunale eiendommer. Bygningstypen kan være utdatert hvis bygget har endret bruk.
 
+### Dekningsgrad
+
+Fanen viser hvor godt de valgte formålene dekker brukergruppen, per delbydel eller bydel (grunnkrets når grensene er lagt inn).
+
+1. **Befolkning** per grunnkrets og delbydel hentes fra Oslo kommunes statistikkbank (tabell BEF003, BEF002). Befolkningen i hvert område fordeles på boligbyggene der etter antall boenheter i matrikkelen.
+2. **Nedslagsfelt:** Hver bolig knyttes til nærmeste valgte anlegg målt langs gangnettet fra OpenStreetMap. Grensen mellom to like anlegg havner der gangavstanden til begge er lik. Beregningen gjøres i nettleseren for det som er valgt i formålsfilteret.
+3. **Brukergruppe:** Brukere = befolkning i hver aldersgruppe × brukerandel. Andelene er forslag og kan endres i panelet. For barnehage brukes faktisk andel barn 1–5 år i barnehage per delbydel (UTD006).
+4. **Mål:** andel brukere innen valgt gangavstand, kapasitet (elevtall eller antall barnehagebarn per bruker i nedslagsfeltet, ellers anlegg per 1 000 brukere) og gjennomsnittlig gangavstand.
+
+Grunnlaget bygges månedlig av `.github/workflows/dekning.yml` (`hent_befolkning.py`, `hent_gangnett.py`, `bygg_dekning.py`). Boligene (`data/boliger.csv`) lages fra matrikkelen med `bygg_boliger.py`. Legg grunnkretsgrenser i `data/grunnkretser.geojson` (felt `kode`) for å få grunnkrets som minste nivå.
+
+**Forbehold:** Gangnettet tar ikke hensyn til stigning, og boenheter er en tilnærming for hvor folk bor. Kapasitet for skole bygger på elevtall i skoleregisteret, som mangler for de fleste videregående skolene.
+
 ## Kilder
 
 | Data | Kilde | Lisens |
@@ -46,6 +59,9 @@ Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. 
 | Skoler (navn, elevtall, trinn) | [Udir, Nasjonalt skoleregister](https://data-nsr.udir.no/swagger/index.html) | NLOD |
 | Barnehager (navn, antall barn) | [Udir, Nasjonalt barnehageregister](https://data-nbr.udir.no/swagger/index.html) | NLOD |
 | Idrettsanlegg, uttrekk for Oslo | Anleggsregisteret (idrettsanlegg.no) | Ikke komplett |
+| Befolkning per grunnkrets og delbydel | Oslo kommune, statistikkbanken (grunnlag fra SSB) | Åpne data |
+| Gangnett | OpenStreetMap-bidragsytere | ODbL |
+| Delbydelsgrenser | Oslo kommune, [bydelsfakta](https://github.com/oslokommune/bydelsfakta) | MIT |
 | Bydelsgrenser (forenklede) | Oslo kommune, [bydelsfakta](https://github.com/oslokommune/bydelsfakta) | MIT |
 | Kartbibliotek | [Leaflet 1.9.4](https://leafletjs.com/) | BSD-2 |
 
