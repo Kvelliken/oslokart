@@ -55,10 +55,24 @@ def koordinat(d):
     return round(lat, 6), round(lon, 6)
 
 
-def er_undervisning(d):
-    """Primær næringskode innen undervisning (85.x). Utelukker eksamenskontorer o.l."""
+OSLO_KOMMUNE = "958935420"
+UDIR = "970018131"
+
+
+def relasjon(d, typeid):
+    for r in d.get("ForeldreRelasjoner") or []:
+        if (r.get("Relasjonstype") or {}).get("Id") == typeid:
+            return (r.get("Enhet") or {}).get("Organisasjonsnummer")
+    return None
+
+
+def er_skole_i_oslo(d):
+    """Utelukker eksamenskontorer o.l. (primær næringskode utenfor 85.1-85.3) og
+    norske skoler i utlandet, som har Udir som tilsyn og bare en administrativ adresse i Oslo."""
     koder = sorted(d.get("Naeringskoder") or [], key=lambda k: k.get("Prioritet") or 9)
-    return not koder or (koder[0].get("Kode") or "").startswith("85")
+    if koder and not (koder[0].get("Kode") or "")[:4] in ("85.1", "85.2", "85.3"):
+        return False
+    return relasjon(d, "2") != UDIR
 
 
 def adresse(d):
@@ -94,12 +108,16 @@ def skoletype(d):
 
 
 def skole_eier(d):
+    """K = Oslo kommune, S = staten, P = privat og andre eiere (f.eks. andre fylkeskommuner)."""
     kat = {k.get("Navn", "").lower() for k in d.get("Skolekategorier") or []}
-    if d.get("ErPrivatskole") or "privat eiet" in kat:
-        return "P"
+    eier = relasjon(d, "1")
+    if eier == OSLO_KOMMUNE:
+        return "K"
     if "statlig" in kat:
         return "S"
-    return "K"
+    if eier is None and not d.get("ErPrivatskole") and "privat eiet" not in kat:
+        return "K"
+    return "P"
 
 
 def hent_skoler(sted):
@@ -111,7 +129,7 @@ def hent_skoler(sted):
     ut = []
     for d in detaljer(NSR, valgt):
         lat, lon = koordinat(d)
-        if lat is None or not er_undervisning(d):
+        if lat is None or not er_skole_i_oslo(d):
             continue
         ut.append({
             "o": d["Organisasjonsnummer"],
@@ -132,11 +150,14 @@ def hent_skoler(sted):
 
 def barnehage_eier(d):
     kat = {k.get("Navn", "").lower() for k in d.get("Barnehagekategorier") or []}
-    if d.get("ErPrivatBarnehage") or "privat barnehage" in kat:
-        return "P"
+    eier = relasjon(d, "1")
+    if eier == OSLO_KOMMUNE:
+        return "K"
     if "statlig barnehage" in kat:
         return "S"
-    return "K"
+    if eier is None and not d.get("ErPrivatBarnehage") and "privat barnehage" not in kat:
+        return "K"
+    return "P"
 
 
 def barnehagetype(d):

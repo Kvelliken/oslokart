@@ -47,7 +47,7 @@
     ingen: { navn: "Ingen bygg", farge: FARGE.beige }
   };
 
-  const EIER = { K: "Kommunal", S: "Statlig", P: "Privat og annet" };
+  const EIER = { K: "Oslo kommune", S: "Staten", P: "Privat og andre eiere" };
   const navnForm = (t) => (t || "").toLowerCase().replace(/(^|[\s-])\S/g, (s) => s.toUpperCase())
     .replace(/ (Kommune|Kf|As|Og|I)\b/g, (m) => (m === " Kf" || m === " As" ? m.toUpperCase() : m.toLowerCase()));
 
@@ -655,7 +655,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=3`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=4`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
