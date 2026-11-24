@@ -40,8 +40,17 @@
     maal: "innen",
     avstand: 1000,
     andeler: lesAndeler(),
-    faktiskBarnehage: true
+    faktiskBarnehage: true,
+    marka: false
   };
+
+  const MARKA_GK = ["51", "58", "59", "60"];
+  function erMarka(niva, kode) {
+    kode = String(kode);
+    if (niva === "grunnkrets") return MARKA_GK.includes(kode.slice(0, 2));
+    if (niva === "delbydel") return kode === "1701";
+    return kode === "17";
+  }
 
   function lesAndeler() {
     try {
@@ -262,6 +271,7 @@
     const bhAndel = G.barnehageandel_1_5 || {};
     const bhOslo = bhAndel["100000"];
     const brukereOmrade = G.omrader.map((o) => {
+      if (!tilstand.marka && o.delbydel === "1701") return 0;
       let s = 0;
       for (let g = 0; g < 13; g++) {
         let a = andel[g];
@@ -365,6 +375,7 @@
       if (!aktiv || !resultat || niva !== tilstand.niva) return;
       if (flatelag) kart.removeLayer(flatelag);
       flatelag = L.geoJSON(gj, {
+        filter: (ft) => tilstand.marka || !erMarka(niva, ft.properties.kode),
         style: (ft) => {
           const r = resultat.omr.get(String(ft.properties.kode));
           const c = r ? farge(r.v) : null;
@@ -496,6 +507,7 @@
     ui.liste = document.getElementById("dk-liste");
     ui.listeTittel = document.getElementById("dk-liste-tittel");
     ui.kilde = document.getElementById("dk-kilde");
+    document.getElementById("dk-marka").addEventListener("change", (e) => { tilstand.marka = e.target.checked; beregn(); });
 
     ui.niva.addEventListener("change", () => { tilstand.niva = ui.niva.value; aggreger(); });
     ui.maal.addEventListener("change", () => { tilstand.maal = ui.maal.value; aggreger(); });
