@@ -46,6 +46,7 @@ jobs:
             echo "endret=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "Oppdater skoler og barnehager fra Udir ($(date +%F))"
+            git pull --rebase
             git push
             echo "endret=true" >> "$GITHUB_OUTPUT"
           fi
