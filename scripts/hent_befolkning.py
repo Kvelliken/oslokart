@@ -54,6 +54,7 @@ def tabell_til_dict(ds):
 
 
 ALLE = {"filter": "all", "values": ["*"]}
+FRAM = "Befolkning/Befolkningsframskrivinger/OK_BEF038.px"
 SISTE = {"filter": "top", "values": ["1"]}
 
 
@@ -92,19 +93,40 @@ def main():
         if v is not None:
             barnehageandel[d["bosted"]] = v
 
+    # Framskriving per delbydel og ettårig alder (mellomalternativet), samlet i delbydelsgruppene
+    grenser = [(0, 0), (1, 5), (6, 12), (13, 15), (16, 19), (20, 29), (30, 39), (40, 49), (50, 59), (60, 66),
+               (67, 79), (80, 89), (90, 200)]
+    fram_aar = ["2026", "2030", "2035", "2040", "2050"]
+    meta = json.load(urlopen(Request(f"{API}/{quote(FRAM)}"), timeout=60))
+    aar_var = next(v for v in meta["variables"] if v["code"] == "år")
+    aar_idx = [aar_var["values"][aar_var["valueTexts"].index(a)] for a in fram_aar if a in aar_var["valueTexts"]]
+    ider, fr, et = tabell_til_dict(sporring(FRAM, {"geografi": ALLE, "kjønn": {"filter": "item", "values": ["0"]},
+                                                   "alder": ALLE, "statistikkvariabel": ALLE,
+                                                   "år": {"filter": "item", "values": aar_idx}}))
+    framskriving = {}
+    for nokkel, v in fr.items():
+        d = dict(zip(ider, nokkel))
+        aar = et["år"][d["år"]]
+        alder = int(d["alder"])
+        g = next(i for i, (a, b) in enumerate(grenser) if a <= alder <= b)
+        rad = framskriving.setdefault(aar, {}).setdefault(d["geografi"], [0] * 13)
+        rad[g] += v or 0
+
     data = {
-        "kilde": "Oslo kommune, statistikkbanken (BEF003, BEF002, UTD006). Grunnlagstall fra SSB.",
+        "kilde": "Oslo kommune, statistikkbanken (BEF003, BEF002, UTD006, BEF038). Grunnlagstall fra SSB.",
         "aar": {"grunnkrets": aar_gk, "delbydel": aar_db, "barnehage": aar_bh},
         "grupper_grunnkrets": gk_grupper,
         "grupper_delbydel": db_grupper,
         "grunnkretser": grunnkretser,
         "delbydeler": delbydeler,
         "barnehageandel_1_5": barnehageandel,
+        "framskriving": framskriving,
     }
     with open(ROOT / "data" / "befolkning.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"Grunnkretser: {len(grunnkretser)} ({aar_gk}), delbydeler: {len(delbydeler)} ({aar_db}), "
           f"barnehageandel: {len(barnehageandel)} ({aar_bh})")
+    print("Framskriving:", {a: round(sum(sum(r) for r in v.values())) for a, v in framskriving.items()})
     print("Grupper grunnkrets:", gk_grupper)
     print("Grupper delbydel:", db_grupper)
     print("Sum grunnkrets:", sum(sum(r["a"]) for r in grunnkretser.values()),

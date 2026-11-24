@@ -158,6 +158,59 @@ def main():
         eps = pd.concat([eps, pd.DataFrame(ekstra)], ignore_index=True)
         print("Områder uten boliger, plassert i midten:", len(ekstra), "av", len(uten))
 
+    # --- Ruter (250 m) for kart over udekket behov og kandidatplasseringer
+    CELLE = 250
+    ep_x = x[eps.node.values.astype(int)]
+    ep_y = y[eps.node.values.astype(int)]
+    ep_ix = np.floor(ep_x / CELLE).astype(int)
+    ep_iy = np.floor(ep_y / CELLE).astype(int)
+    # Gyldige kandidatruter: senter innenfor byggesonen (grunnkretser utenom Marka, ellers bydelene)
+    if bruk_gk:
+        sone = gk[~gk.kode.str.startswith(MARKA_PREFIKS)].geometry.union_all()
+    else:
+        sone = bd.geometry.union_all()
+    minx, miny, maxx, maxy = sone.bounds
+    ixs = np.arange(int(minx // CELLE), int(maxx // CELLE) + 1)
+    iys = np.arange(int(miny // CELLE), int(maxy // CELLE) + 1)
+    gx, gy = np.meshgrid(ixs, iys)
+    gx, gy = gx.ravel(), gy.ravel()
+    sentre = gpd.GeoSeries(gpd.points_from_xy((gx + 0.5) * CELLE, (gy + 0.5) * CELLE), crs=25833)
+    inni = sentre.within(sone).values
+    dist_node, node_c = tre.query(np.column_stack([(gx + 0.5) * CELLE, (gy + 0.5) * CELLE]))
+    kand = inni & (dist_node <= 175)
+    celler = {}
+    for ix, iy, n in zip(gx[kand], gy[kand], node_c[kand]):
+        celler[(ix, iy)] = {"k": 1, "n": int(n)}
+    for ix, iy in set(zip(ep_ix, ep_iy)):
+        if (ix, iy) not in celler:
+            _, n = tre.query([(ix + 0.5) * CELLE, (iy + 0.5) * CELLE])
+            celler[(ix, iy)] = {"k": 0, "n": int(n)}
+    cnokler = sorted(celler)
+    cindeks = {c: i for i, c in enumerate(cnokler)}
+    hj = np.array(cnokler)
+    sw_lon, sw_lat = tr.transform(hj[:, 0] * CELLE, hj[:, 1] * CELLE)
+    ne_lon, ne_lat = tr.transform((hj[:, 0] + 1) * CELLE, (hj[:, 1] + 1) * CELLE)
+    celle_ut = {
+        "storrelse": CELLE,
+        "sw_lat": [round(v * 1e5) for v in sw_lat], "sw_lon": [round(v * 1e5) for v in sw_lon],
+        "ne_lat": [round(v * 1e5) for v in ne_lat], "ne_lon": [round(v * 1e5) for v in ne_lon],
+        "node": [celler[c]["n"] for c in cnokler],
+        "kandidat": [celler[c]["k"] for c in cnokler],
+    }
+    ep_celle = [cindeks[(a, b)] for a, b in zip(ep_ix, ep_iy)]
+    print("Ruter:", len(cnokler), "herav kandidater:", int(sum(celle_ut["kandidat"])))
+
+    # --- Framskriving: faktor per delbydel og aldersgruppe, relativt til 2026
+    fram = bef.get("framskriving") or {}
+    faktor = {}
+    if "2026" in fram:
+        base = fram["2026"]
+        for aar, rader in fram.items():
+            if aar == "2026":
+                continue
+            faktor[aar] = {db_: [round(r[g] / base[db_][g], 3) if base.get(db_) and base[db_][g] > 0 else 1.0
+                                 for g in range(13)] for db_, r in rader.items()}
+
     koder = sorted(omrader.keys())
     indeks = {k: i for i, k in enumerate(koder)}
     niva = "grunnkrets" if bruk_gk else "delbydel"
@@ -174,6 +227,9 @@ def main():
         "ep_node": eps.node.astype(int).tolist(),
         "ep_omrade": [indeks[k] for k in eps.omrade],
         "ep_vekt": [round(v, 5) for v in eps.w],
+        "ep_celle": ep_celle,
+        "celler": celle_ut,
+        "framskriving": {"basis": "2026", "aar": sorted(faktor), "faktor": faktor},
     }
     with open(OUT / "dekning_grunnlag.json", "w", encoding="utf-8") as f:
         json.dump(grunnlag, f, ensure_ascii=False, separators=(",", ":"))
