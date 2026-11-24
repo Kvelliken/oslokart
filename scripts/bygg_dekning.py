@@ -32,7 +32,9 @@ GK_TIL_DB = [[0, 1], [2, 3], [4], [5], [6], [7], [8, 9], [10, 11, 12]]
 
 
 def les_geojson(sti, crs=4326):
-    return gpd.read_file(sti).set_crs(crs, allow_override=True).to_crs(25833)
+    g = gpd.read_file(sti).set_crs(crs, allow_override=True).to_crs(25833)
+    g["geometry"] = g.geometry.make_valid()
+    return g
 
 
 def main():

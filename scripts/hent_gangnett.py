@@ -20,7 +20,7 @@ def main():
     ox.settings.use_cache = True
     ox.settings.log_console = False
     bydeler = gpd.read_file(ROOT / "data" / "bydeler.geojson").to_crs(25833)
-    omrade = bydeler.union_all().buffer(BUFFER_M)
+    omrade = bydeler.geometry.make_valid().buffer(0).union_all().buffer(BUFFER_M)
     omrade_wgs = gpd.GeoSeries([omrade], crs=25833).to_crs(4326).iloc[0]
 
     G = ox.graph_from_polygon(omrade_wgs, network_type="walk", simplify=True, retain_all=False)
