@@ -56,7 +56,6 @@ def koordinat(d):
 
 
 OSLO_KOMMUNE = "958935420"
-UDIR = "970018131"
 
 
 def relasjon(d, typeid):
@@ -68,16 +67,12 @@ def relasjon(d, typeid):
 
 def er_skole_i_oslo(d):
     """Utelukker eksamenskontorer o.l. (primær næringskode utenfor 85.1-85.3) og
-    norske skoler i utlandet, som har Udir som tilsyn og bare en administrativ adresse i Oslo."""
+    enheter uten skoletrinn, som norske skoler i utlandet med administrativ adresse i Oslo."""
     koder = sorted(d.get("Naeringskoder") or [], key=lambda k: k.get("Prioritet") or 9)
-    if koder and not (koder[0].get("Kode") or "")[:4] in ("85.1", "85.2", "85.3"):
+    if koder and (koder[0].get("Kode") or "")[:4] not in ("85.1", "85.2", "85.3"):
         return False
-    return relasjon(d, "2") != UDIR
-
-
-def adresse(d):
-    a = d.get("Beliggenhetsadresse") or {}
-    return (a.get("Adresse") or "").strip() or None
+    har_trinn = d.get("SkoletrinnGSFra") or d.get("SkoletrinnVGSFra")
+    return bool(har_trinn or d.get("ErSpesialskole") or d.get("Elevtall"))
 
 
 def nettside(d):
