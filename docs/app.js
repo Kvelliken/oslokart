@@ -728,6 +728,16 @@
     });
   }
 
+  // Omtrentlig midtpunkt: snitt av ytterringen i den største flaten
+  function midtpunkt(g) {
+    const flater = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+    let ring = flater[0][0];
+    flater.forEach((f) => { if (f[0].length > ring.length) ring = f[0]; });
+    let x = 0, y = 0;
+    ring.forEach(([a, b]) => { x += a; y += b; });
+    return { lon: x / ring.length, lat: y / ring.length };
+  }
+
   const hentJson = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url); return r.json(); });
 
   hentJson("data/eiendommer.geojson")
@@ -751,7 +761,13 @@
       window.Oslokart = {
         kart, tilstand, FORMAL, FARGE, esc, fmt, punkter,
         anleggForDekning, punktPopup: (p) => visPunktPopup(L.latLng(p.lat, p.lon), p),
-        oppdaterTegnforklaring: lagTegnforklaring
+        oppdaterTegnforklaring: lagTegnforklaring,
+        FORVALTER, tittel, visEiendom,
+        // Ubebygde kommunale tomter (filtrene fra fanen «Ubebygde tomter») som kandidater
+        tomtKandidater: (minAreal) => data.filter((f) => {
+          const p = f.properties;
+          return erUbebygd(p) && p.b !== "Marka" && p.m2 >= minAreal && tilstand.forvaltere.has(p.f);
+        }).map((f) => ({ p: f.properties, ...midtpunkt(f.geometry) }))
       };
       if (window.Dekning) window.Dekning.start(window.Oslokart);
       oppdater();

@@ -35,18 +35,38 @@ Kartlaget viser skoler, barnehager, idrettsanlegg og andre formål som sirkler. 
 - **Idrettsanleggene er ikke komplette.** Uttrekket fra Anleggsregisteret dekker ikke alle idrettsanlegg i Oslo. 54 anlegg har en felles standardplassering i registeret og vises ikke i kartet.
 - **Helse, kultur og beredskap** bygger på bygningstypen i matrikkelen og gjelder bare bygg på kommunale eiendommer. Bygningstypen kan være utdatert hvis bygget har endret bruk.
 
-### Dekningsgrad
+### Dekningsgrad – udekket behov
 
-Fanen viser hvor godt de valgte formålene dekker brukergruppen, per delbydel eller bydel (grunnkrets når grensene er lagt inn).
+Fanen finner områder der brukerne bor for langt fra et tilbud, eller der tilbudet er fullt, og foreslår hvor et nytt tilbud gir nytte for flest. Arbeidet følger fire steg:
 
-1. **Befolkning** per grunnkrets og delbydel hentes fra Oslo kommunes statistikkbank (tabell BEF003, BEF002). Befolkningen i hvert område fordeles på boligbyggene der etter antall boenheter i matrikkelen.
-2. **Nedslagsfelt:** Hver bolig knyttes til nærmeste valgte anlegg målt langs gangnettet fra OpenStreetMap. Grensen mellom to like anlegg havner der gangavstanden til begge er lik. Beregningen gjøres i nettleseren for det som er valgt i formålsfilteret.
-3. **Brukergruppe:** Brukere = befolkning i hver aldersgruppe × brukerandel. Andelene er forslag og kan endres i panelet. For barnehage brukes faktisk andel barn 1–5 år i barnehage per delbydel (UTD006).
-4. **Mål:** andel brukere innen valgt gangavstand, kapasitet (elevtall eller antall barnehagebarn per bruker i nedslagsfeltet, ellers anlegg per 1 000 brukere) og gjennomsnittlig gangavstand.
+1. **Tilbud:** Velg tilbudet i kartlaget «Formål og anlegg», for eksempel barnehage eller bandybane.
+2. **Brukere og gangavstand:**
+   - **Befolkning:** i dag eller framskrevet til 2030, 2035, 2040 eller 2050. Framskrivingen er mellomalternativet i BEF038, og endringen per delbydel og aldersgruppe er fordelt på grunnkretsene.
+   - **Brukerandel per aldersgruppe:** kan justeres i panelet.
+   - **Akseptabel gangavstand:** standardverdi per formål.
+   - **Marka:** er utelatt med mindre du velger det.
+3. **Udekket behov:**
+   - **Kart:** Varmekartet viser antall udekkede brukere per rute på 250 × 250 m. Listen summerer per delbydel, bydel eller grunnkrets.
+   - **For langt unna:** Brukere regnes som udekket når gangavstanden til nærmeste tilbud er lengre enn grensen.
+   - **Fullt tilbud:** For barnehage og skole regnes også brukere som udekket når nærmeste tilbud har færre plasser enn brukere. Overskuddet fordeles på alle brukerne i nedslagsfeltet.
+4. **Forslag til plassering:** Valget gjøres steg for steg, med en «grådig» algoritme:
+   1. Finn stedet med flest udekkede brukere innen gangavstanden.
+   2. Regn disse brukerne som dekket.
+   3. Finn det neste beste stedet.
 
-Grunnlaget bygges månedlig av `.github/workflows/dekning.yml` (`hent_befolkning.py`, `hent_gangnett.py`, `bygg_dekning.py`). Boligene (`data/boliger.csv`) lages fra matrikkelen med `bygg_boliger.py`. Grunnkretsgrensene (`data/grunnkretser.geojson`) er fra Kartverket via Geonorge (2025). Hver grunnkrets knyttes til delbydelen den overlapper mest. Marka-kretsene (nummer 51xx, 58xx, 59xx og 60xx) og Sentrum-kretsene, som mangler i delbydelsgrensene, legges til Marka og Sentrum. Summen per delbydel stemmer da med statistikkbanken.
+   Kandidater kan være alle ruter i byggesonen eller kommunens ubebygde tomter. For tomtene gjelder filtrene i fanen «Ubebygde tomter». Du kan også sette en grense for hvor mange brukere hvert nytt tilbud kan ta.
 
-**Forbehold:** Gangnettet tar ikke hensyn til stigning, og boenheter er en tilnærming for hvor folk bor. Kapasitet for skole bygger på elevtall i skoleregisteret, som mangler for de fleste videregående skolene.
+**Beregning:**
+- **Befolkningen:** fra Oslo statistikkbank (BEF003, BEF002), fordelt på boligene etter antall boenheter i matrikkelen.
+- **Gangavstandene:** regnes langs gangnettet fra OpenStreetMap, direkte i nettleseren.
+- **Oppdatering:** Grunnlaget bygges på nytt hver måned av `.github/workflows/dekning.yml`, med skriptene `hent_befolkning.py`, `hent_gangnett.py` og `bygg_dekning.py`.
+- **Grunnkretsgrensene** kommer fra Kartverket. Hver grunnkrets knyttes til delbydelen den overlapper mest. Marka- og Sentrum-kretsene legges til Marka og Sentrum ut fra kretsnummer og navn.
+
+**Forbehold:**
+- **Nærmeste tilbud:** Modellen antar at alle bruker nærmeste tilbud. Det overdriver kapasitetsproblemet der tilbud ligger tett med ujevn størrelse.
+- **Gangnettet** tar ikke hensyn til stigning.
+- **Ruter:** Brukerne i en rute regnes fra rutens midtpunkt.
+- **Videregående skoler** mangler elevtall i skoleregisteret.
 
 ## Kilder
 
