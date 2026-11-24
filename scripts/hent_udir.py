@@ -75,6 +75,11 @@ def er_skole_i_oslo(d):
     return bool(har_trinn or d.get("ErSpesialskole") or d.get("Elevtall"))
 
 
+def adresse(d):
+    a = d.get("Beliggenhetsadresse") or {}
+    return (a.get("Adresse") or "").strip() or None
+
+
 def nettside(d):
     w = (d.get("Internettadresse") or "").strip()
     if not w:
