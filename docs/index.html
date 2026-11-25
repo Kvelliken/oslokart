@@ -6,11 +6,12 @@
 <title>Kommunale tomter i Oslo</title>
 <meta name="description" content="Kart over eiendommer Oslo kommune eier, koblet mot matrikkelen. Finn ubebygde tomter og slå opp regulering i Planinnsyn.">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <div class="app">
   <aside class="panel" id="panel">
+    <div class="panel-topp">
     <header class="topp">
       <h1>Kommunale tomter i Oslo</h1>
       <p class="ingress">Eiendommer Oslo kommune eier, koblet mot eiendomsgrenser og bygninger i matrikkelen.</p>
@@ -21,6 +22,9 @@
       <button role="tab" id="fane-tomter" class="fane" aria-selected="false">Ubebygde tomter</button>
       <button role="tab" id="fane-dekning" class="fane" aria-selected="false">Dekningsgrad</button>
     </div>
+    </div>
+
+    <div class="panel-innhold" id="panel-innhold">
 
     <section class="nokkeltall kun-eiendom" aria-live="polite">
       <div class="tall"><span id="tall-antall">–</span><small id="tall-antall-tekst">tomter</small></div>
@@ -28,14 +32,14 @@
     </section>
 
     <section class="dekning kun-dekning" hidden>
-      <h2>Udekket behov</h2>
-      <p class="dk-ingress">Finn områder der brukerne bor for langt fra tilbudet eller der tilbudet er fullt, og hvor et nytt tilbud vil gi nytte for flest.</p>
-      <p class="dk-status" id="dk-status">Laster grunnlaget …</p>
+      <p class="dk-ingress">Finn hvor brukerne bor for langt fra et tilbud, og hvor et nytt tilbud gir nytte for flest.</p>
+      <div class="dk-steg dk-steg-1">
+        <h3><span class="dk-nr">1</span> Velg tilbud</h3>
+        <div id="dk-tilbud-slot"></div>
+        <p class="dk-utvalg" id="dk-utvalg"></p>
+      </div>
+      <p class="dk-status" id="dk-status">Laster befolkning og gangnett …</p>
       <div id="dk-innhold" hidden>
-        <div class="dk-steg">
-          <h3><span class="dk-nr">1</span> Tilbud</h3>
-          <p class="dk-utvalg" id="dk-utvalg"></p>
-        </div>
 
         <div class="dk-steg">
           <h3><span class="dk-nr">2</span> Brukere og gangavstand</h3>
@@ -58,7 +62,7 @@
         </div>
 
         <div class="dk-steg">
-          <h3><span class="dk-nr">3</span> Udekket behov</h3>
+          <h3 id="dk-steg-3"><span class="dk-nr">3</span> Udekket behov</h3>
           <div class="dk-resultat" id="dk-resultat" aria-live="polite"></div>
           <label class="felt"><span>Summer per</span>
             <select id="dk-niva">
@@ -150,7 +154,7 @@
       </fieldset>
     </section>
 
-    <section class="kartlag" aria-labelledby="kartlag-tittel">
+    <section class="kartlag" id="kartlag-seksjon" aria-labelledby="kartlag-tittel">
       <h2 id="kartlag-tittel">Kartlag</h2>
       <div id="kartlag"></div>
     </section>
@@ -167,6 +171,7 @@
       <p><strong>Uoffisiell oversikt.</strong> Laget av åpne data, ikke et produkt fra Oslo kommune. Sjekk alltid regulering i Planinnsyn og eierforhold i Eiendomsregisteret.</p>
       <p>Kilder: <a href="https://www.oslo.kommune.no/plan-bygg-og-eiendom/kart-og-eiendomsinformasjon/kommunal-eiendom/eiendomsoversikt">Oslo kommunes eiendomsoversikt</a> (<span id="kilde-dato">oktober 2026</span>), Kartverket – Matrikkelen (CC BY 4.0), Udir – Nasjonalt skoleregister og barnehageregister (NLOD), Anleggsregisteret (idrettsanlegg.no), bydelsgrenser fra Oslo kommune/Bydelsfakta (MIT). <a href="https://github.com/Kvelliken/oslokart">Kode og metode</a>.</p>
     </footer>
+    </div>
   </aside>
 
   <main class="kart-ramme">
@@ -177,7 +182,7 @@
 </div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="dekning.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="dekning.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

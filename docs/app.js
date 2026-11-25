@@ -181,7 +181,7 @@
   }
 
   function stilBakgrunn() {
-    return { renderer, color: FARGE.morkBeige, weight: 0.6, fillColor: FARGE.morkBeige, fillOpacity: tilstand.formal ? 0.12 : 0.25, interactive: false };
+    return { color: FARGE.morkBeige, weight: 0.6, opacity: 1, fillColor: FARGE.morkBeige, fillOpacity: tilstand.formal ? 0.12 : 0.25 };
   }
 
   function eiendomPopup(p) {
@@ -215,27 +215,47 @@
     </div>`;
   }
 
-  function tegnFlater() {
-    if (bakgrunnslag) kart.removeLayer(bakgrunnslag);
-    if (hovedlag) kart.removeLayer(hovedlag);
-    lagPerId.clear();
+  // Alle eiendomsflatene lages én gang. Ved filterendring legges de til, fjernes eller får ny stil,
+  // i stedet for å bygges på nytt (det var det som gjorde faner og filtre trege).
+  const flategruppe = L.featureGroup();
+  const stilNokkel = new Map();
+  let flaterLaget = false;
 
-    const ids = new Set(utvalg.map((f) => f.properties.i));
-    if (tilstand.modus === "tomter") {
-      bakgrunnslag = L.geoJSON({ type: "FeatureCollection", features: data }, {
-        style: stilBakgrunn,
-        filter: (f) => !ids.has(f.properties.i) && tilstand.forvaltere.has(f.properties.f)
-      }).addTo(kart);
-    } else {
-      bakgrunnslag = null;
-    }
-    hovedlag = L.geoJSON({ type: "FeatureCollection", features: utvalg }, {
-      style: stilHoved,
+  function lagFlater() {
+    L.geoJSON({ type: "FeatureCollection", features: data }, {
+      style: () => ({ renderer }),
       onEachFeature: (f, lag) => {
         lagPerId.set(f.properties.i, lag);
         lag.bindPopup(() => eiendomPopup(f.properties), { maxWidth: 340 });
       }
-    }).addTo(kart);
+    });
+    flategruppe.addTo(kart);
+    flaterLaget = true;
+  }
+
+  function tegnFlater() {
+    if (!flaterLaget) lagFlater();
+    const ids = new Set(utvalg.map((f) => f.properties.i));
+    const fram = [];
+    data.forEach((f) => {
+      const p = f.properties;
+      const lag = lagPerId.get(p.i);
+      let stil = null, type = "";
+      if (ids.has(p.i)) { stil = stilHoved(f); type = "h"; } else if (tilstand.modus === "tomter" && tilstand.forvaltere.has(p.f)) { stil = stilBakgrunn(); type = "b"; }
+      if (!stil) {
+        if (flategruppe.hasLayer(lag)) flategruppe.removeLayer(lag);
+        stilNokkel.delete(p.i);
+        return;
+      }
+      const nokkel = type + stil.color + stil.weight + stil.opacity + stil.fillColor + stil.fillOpacity;
+      if (stilNokkel.get(p.i) !== nokkel) {
+        lag.setStyle(stil);
+        if (stilNokkel.get(p.i) !== undefined && type === "h" && stilNokkel.get(p.i)[0] !== "h") fram.push(lag);
+        stilNokkel.set(p.i, nokkel);
+      }
+      if (!flategruppe.hasLayer(lag)) { flategruppe.addLayer(lag); if (type === "h") fram.push(lag); }
+    });
+    if (tilstand.modus === "tomter") fram.forEach((l) => l.bringToFront());
   }
 
   // ---------- Kartlag: formål og anlegg ----------
@@ -396,7 +416,7 @@
     const p = eiendomPerNokkel.get(nokkel);
     if (!p) return;
     const lag = lagPerId.get(p.i);
-    if (lag) {
+    if (lag && flategruppe.hasLayer(lag)) {
       kart.fitBounds(lag.getBounds(), { maxZoom: 17, padding: [40, 40] });
       lag.openPopup(lag.getBounds().getCenter());
       return;
@@ -597,7 +617,7 @@
 
   function velg(id) {
     const lag = lagPerId.get(id);
-    if (!lag) return;
+    if (!lag || !flategruppe.hasLayer(lag)) return;
     kart.fitBounds(lag.getBounds(), { maxZoom: 17, padding: [40, 40] });
     lag.openPopup(lag.getBounds().getCenter());
     if (window.matchMedia("(max-width: 800px)").matches) document.getElementById("panel").classList.remove("apen");
@@ -620,8 +640,16 @@
       const k = document.getElementById("lag-formal");
       if (k) { k.checked = true; tilstand.formal = true; document.getElementById("formal-innhold").hidden = false; }
     }
+    plasserKartlag();
     if (window.Dekning) window.Dekning.modus(tilstand.modus === "dekning");
     oppdaterPunkter();
+  }
+
+  function plasserKartlag() {
+    const seksjon = document.getElementById("kartlag-seksjon");
+    const maal = tilstand.modus === "dekning" ? document.getElementById("dk-tilbud-slot")
+      : document.querySelector(".liste.kun-eiendom");
+    if (tilstand.modus === "dekning") { if (seksjon.parentNode !== maal) maal.appendChild(seksjon); } else if (seksjon.nextElementSibling !== maal) maal.parentNode.insertBefore(seksjon, maal);
   }
 
   function lagTegnforklaring() {
@@ -707,11 +735,13 @@
     const faner = { alle: document.getElementById("fane-alle"), tomter: document.getElementById("fane-tomter"), dekning: document.getElementById("fane-dekning") };
     Object.entries(faner).forEach(([modus, knapp]) => {
       knapp.addEventListener("click", () => {
+        if (tilstand.modus === modus) return;
         tilstand.modus = modus;
         Object.entries(faner).forEach(([m, k]) => { k.classList.toggle("aktiv", m === modus); k.setAttribute("aria-selected", m === modus); });
         if (modus === "alle" && tilstand.minareal === 1000) { tilstand.minareal = 0; document.getElementById("minareal").value = "0"; }
         if (modus === "tomter" && tilstand.minareal === 0) { tilstand.minareal = 1000; document.getElementById("minareal").value = "1000"; }
-        oppdater();
+        document.getElementById("panel-innhold").scrollTop = 0;
+        requestAnimationFrame(() => setTimeout(oppdater, 0));
       });
     });
 
@@ -721,6 +751,21 @@
     });
     document.getElementById("last-ned").addEventListener("click", lastNedCsv);
     document.getElementById("vis-panel").addEventListener("click", () => document.getElementById("panel").classList.toggle("apen"));
+
+    const rulle = document.getElementById("panel-innhold");
+    const holdIRo = (el) => {
+      if (!el || !rulle.contains(el)) return;
+      const for0 = el.getBoundingClientRect().top;
+      const juster = () => {
+        if (!el.isConnected || !el.offsetParent) return;
+        const d = el.getBoundingClientRect().top - for0;
+        if (Math.abs(d) > 1) rulle.scrollTop += d;
+      };
+      requestAnimationFrame(() => { juster(); requestAnimationFrame(juster); });
+      setTimeout(juster, 150);
+    };
+    rulle.addEventListener("change", (e) => holdIRo(e.target), true);
+    rulle.addEventListener("click", (e) => { const t = e.target.closest("button, label, summary"); if (t && !t.hasAttribute("data-rull")) holdIRo(t); }, true);
 
     let forrigeRadius = radius();
     kart.on("zoomend", () => {
@@ -744,7 +789,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=5`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=10`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
@@ -771,6 +816,8 @@
       };
       if (window.Dekning) window.Dekning.start(window.Oslokart);
       oppdater();
+      const ledig = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+      ledig(() => { if (window.Dekning) window.Dekning.forhaand(); });
     })
     .catch(() => {
       document.getElementById("toppliste").innerHTML = '<li class="tom">Klarte ikke å laste dataene.</li>';

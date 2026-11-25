@@ -72,7 +72,7 @@
 
   function last() {
     if (lasting) return lasting;
-    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=8"), hent("data/dekning_nett.json?v=8")])
+    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=10"), hent("data/dekning_nett.json?v=10")])
       .then(([g, n]) => {
         G = g; N = n;
         byggNett();
@@ -99,7 +99,7 @@
 
   function hentGeo(niva) {
     if (geo[niva]) return Promise.resolve(geo[niva]);
-    return hent(`data/omrader_${niva}.geojson?v=8`).then((g) => (geo[niva] = g));
+    return hent(`data/omrader_${niva}.geojson?v=10`).then((g) => (geo[niva] = g));
   }
 
   // ---------- Nett ----------
@@ -251,7 +251,7 @@
     const { anlegg, hoved } = valgteTilbud();
     R = null;
     if (!anlegg.length) {
-      visMelding("Velg tilbudet du vil se på i kartlaget «Formål og anlegg» under, for eksempel Barnehage eller Bandybane.");
+      visMelding("");
       return;
     }
     if (hoved.length > 1) {
@@ -392,6 +392,7 @@
   function visMelding(t) {
     fjernLag();
     ui.utvalg.textContent = t;
+    ui.innhold.classList.toggle("dk-uten-valg", !t);
     ui.resultat.innerHTML = "";
     ui.liste.innerHTML = "";
     ui.finn.disabled = true;
@@ -401,10 +402,11 @@
   function visResultat() {
     const fmt = api.fmt, esc = api.esc;
     const { f, anlegg, tot, kap } = R;
+    ui.innhold.classList.remove("dk-uten-valg");
     const under = [...new Set(anlegg.map((p) => (p.f === "idrett" ? p.t : p.u)))];
     ui.utvalg.innerHTML = `${fmt.format(anlegg.length)} eksisterende tilbud: ${esc(api.FORMAL[f].navn)}` +
       (under.length <= 4 ? ` (${esc(under.join(", "))})` : ` (${under.length} typer)`) +
-      ". Endre utvalget i «Formål og anlegg» under.";
+      ".";
     const udekket = tot.avstand + tot.kapasitet;
     const pst = tot.brukere > 0 ? Math.round(udekket / tot.brukere * 100) : 0;
     ui.resultat.innerHTML = `<div class="nokkeltall">
@@ -416,6 +418,10 @@
       (R.manglerKap && kap && tilstand.kap ? ` ${fmt.format(R.manglerKap)} tilbud mangler kapasitetstall og regnes som ikke fulle.` : "") +
       " Kartet viser udekkede brukere per rute på 250 × 250 m.</p>";
     ui.finn.disabled = udekket < 1;
+    ui.utvalg.insertAdjacentHTML("beforeend", `<span class="dk-sammendrag"><strong>${fmt.format(Math.round(udekket))}</strong> udekkede brukere (${pst} %).
+      <button type="button" class="lenkeknapp" id="dk-til-resultat" data-rull>Se udekket behov og forslag</button></span>`);
+    document.getElementById("dk-til-resultat").addEventListener("click", () =>
+      document.getElementById("dk-steg-3").scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   function oppsummerOmrader() {
@@ -710,6 +716,8 @@
       last().then((ok) => { if (ok) this.oppdater(); });
     },
     oppdater() { if (aktiv && G) beregn(); },
+    // Laster og forbereder grunnlaget i bakgrunnen, så fanen svarer straks
+    forhaand() { last(); },
     punktInfo,
     tegnforklaring
   };

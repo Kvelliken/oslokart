@@ -26,7 +26,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   font-family: var(--font-sans);
   font-weight: 400;
@@ -39,9 +39,9 @@ body {
 
 /* Panel */
 .panel {
-  width: 400px;
-  flex: 0 0 400px;
-  overflow-y: auto;
+  width: 420px;
+  flex: 0 0 420px;
+  overflow: hidden;
   background: var(--flate);
   border-right: 1px solid var(--mork-beige);
   display: flex;
@@ -241,3 +241,40 @@ a { color: var(--mork-bla); }
   background: var(--mork-bla); color: var(--hvit); font: 14px var(--font-sans); border: 2px solid var(--hvit); }
 .dk-forslag .dk-merke { display: inline-flex; width: 22px; height: 22px; font-size: 12px; margin-right: 6px; border: 0; }
 .tf-merke { width: 16px !important; height: 16px !important; font-size: 10px !important; display: inline-flex !important; margin-right: 8px; border: 0 !important; }
+
+
+/* Fast topp med tittel og faner; bare innholdet under ruller */
+.panel-topp { flex: 0 0 auto; }
+.panel-innhold {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable;
+  overflow-anchor: none;
+  display: flex; flex-direction: column; background: var(--flate);
+}
+.topp { padding: 18px var(--marg) 10px; }
+h1 { font-size: 24px; margin-bottom: 4px; }
+.ingress { font-size: 14px; }
+.faner { padding: 0 12px; gap: 2px; }
+.fane { flex: 1 1 auto; padding: 10px 6px; font-size: 14px; white-space: nowrap; text-align: center; }
+
+/* Valg av tilbud i steg 1 under Dekningsgrad */
+.dk-steg-1 { border-top: 0; padding-top: 0; }
+.dk-steg-1 .kartlag { padding: 0; border-top: 0; }
+.dk-steg-1 #kartlag-tittel, .dk-steg-1 .lagvalg { display: none; }
+.dk-steg-1 .lag-innhold { margin-top: 0; padding-left: 0; }
+.dk-steg-1 .tre { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--flate-alt); padding: 4px 6px; }
+.dk-utvalg:empty { display: none; }
+.dk-utvalg { background: var(--flate-alt); padding: 8px 10px; }
+.dekning { padding-top: var(--luft-1); }
+/* Steg 2–4 vises først når et tilbud er valgt */
+.dk-uten-valg > .dk-steg { display: none; }
+.dk-uten-valg::before { content: "Velg et tilbud i listen over, for eksempel Barnehage, eller søk etter «bandy». Da vises brukere, udekket behov og forslag til plassering her."; display: block; font-size: 14px; padding: var(--luft-1) 0; border-top: 1px solid var(--mork-beige); }
+.dk-steg-1 #formal-tomt { display: none; }
+.dk-ingress { margin-bottom: var(--luft-1); }
+.dk-steg-1 .lag-innhold { display: flex; flex-direction: column; }
+.dk-steg-1 .lag-innhold > fieldset:nth-of-type(2) { order: -1; }
+.dk-steg-1 .lag-innhold > .lagmerknad, .dk-steg-1 #last-ned-anlegg { display: none; }
+.dk-steg-1 .lag-innhold > fieldset:first-of-type { margin-top: var(--luft-2); }
+.dk-sammendrag { display: block; margin-top: 6px; }
+.dk-sammendrag .lenkeknapp { margin-left: 4px; }
+#dk-steg-3 { scroll-margin-top: 8px; }
