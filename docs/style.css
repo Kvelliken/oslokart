@@ -278,3 +278,49 @@ h1 { font-size: 24px; margin-bottom: 4px; }
 .dk-sammendrag { display: block; margin-top: 6px; }
 .dk-sammendrag .lenkeknapp { margin-left: 4px; }
 #dk-steg-3 { scroll-margin-top: 8px; }
+
+/* Fire faner må få plass på én linje */
+.faner { padding: 0 10px; gap: 0; }
+.fane { padding: 10px 5px; font-size: 13.5px; }
+
+/* Skolekapasitet */
+.skolekap { padding: var(--luft-1) var(--marg); }
+.skolekap .rad { gap: 12px; }
+.skolekap .felt { margin-bottom: var(--luft-2); }
+.sk-terskel-rad { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.sk-terskel-rad label { display: inline-flex; align-items: center; gap: 6px; }
+.sk-terskel-rad i { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--svart); }
+.sk-terskel-rad input { width: 56px; font: inherit; font-size: 14px; padding: 3px 4px; border: 1px solid var(--svart); border-radius: 0; }
+.sk-terskler .lagmerknad { margin: 4px 0 0; }
+.sk-feil { color: var(--tekst); font-weight: 500; }
+.sk-feil:empty { display: none; }
+.sk-tall { padding: 0; margin: var(--luft-2) 0 0; }
+.sk-tom { background: var(--flate-alt); padding: 8px 10px; margin: 0; font-size: 14px; flex: 1; }
+.sk-liste-topp { margin: var(--luft-1) 0 var(--luft-3); align-items: flex-end; }
+.sk-liste-topp h2 { font-size: 17px; font-weight: 400; margin: 0; }
+.sk-kolonner, .sk-liste li { display: grid; grid-template-columns: 1fr 58px 76px 52px; gap: 8px; align-items: center; }
+.sk-kolonner { font-size: 12px; text-align: right; width: 210px; grid-template-columns: 58px 76px 52px; }
+.sk-liste { list-style: none; margin: 0 0 var(--luft-2); padding: 0; }
+.sk-liste li { border-bottom: 1px solid var(--flate-alt); padding: 3px 0; font-size: 14px; }
+.sk-navn { display: flex; align-items: center; gap: 8px; min-width: 0; text-align: left; font: inherit; font-size: 14px;
+  background: none; border: 0; padding: 4px 0; cursor: pointer; color: var(--tekst); }
+.sk-navn:hover { text-decoration: underline; }
+.sk-navn .prikk { margin-top: 0; border: 1px solid var(--svart); border-radius: 0; }
+.sk-elever, .sk-fylling { text-align: right; font-variant-numeric: tabular-nums; }
+.sk-liste input { width: 100%; font: inherit; font-size: 14px; padding: 3px 5px; border: 1px solid var(--svart); border-radius: 0; text-align: right; }
+.sk-filer { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: var(--luft-1) 0 var(--luft-2); }
+.skolekap .lagmerknad { margin-bottom: var(--luft-2); }
+.sk-popup .felt { margin: 0 0 var(--luft-2); }
+.sk-popup .felt > span { font-size: 12px; }
+.sk-popup input { width: 100%; font: inherit; font-size: 14px; padding: 4px 6px; border: 1px solid var(--svart); border-radius: 0; }
+.sk-kilde { font-size: 12px; }
+.faner { padding: 0 8px; }
+.fane { padding: 10px 4px; font-size: 13px; }
+.sk-terskel-rad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sk-terskel-rad label { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.sk-terskel-rad label > span { display: inline-flex; align-items: center; gap: 6px; }
+.sk-terskel-rad input { width: 64px; }
+.sk-tall .tall { min-height: 84px; }
+.sk-tall .tall { min-height: 0; }
+.sk-tall small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-tall .sk-detalj { font-size: 12px; }

@@ -303,7 +303,7 @@
 
   function tegnPunkter() {
     if (punktlag) { kart.removeLayer(punktlag); punktlag = null; }
-    if (!tilstand.formal) { synligePunkter = []; return; }
+    if (!tilstand.formal || tilstand.modus === "skolekap") { synligePunkter = []; return; }
     synligePunkter = punkter.filter((p) => tilstand.valgt.has(bladNokkel(p)) && passerPunktGrunnfilter(p));
     const r = radius();
     punktlag = L.layerGroup();
@@ -624,7 +624,8 @@
   }
 
   function oppdater() {
-    utvalg = tilstand.modus === "dekning" ? [] : data.filter((f) => {
+    const egenFane = tilstand.modus === "dekning" || tilstand.modus === "skolekap";
+    utvalg = egenFane ? [] : data.filter((f) => {
       const p = f.properties;
       if (!passerFellesFilter(p)) return false;
       return tilstand.modus === "tomter" ? erUbebygd(p) : true;
@@ -634,14 +635,17 @@
     oppdaterListe();
     document.querySelectorAll(".kun-tomter").forEach((el) => { el.hidden = tilstand.modus !== "tomter"; });
     document.querySelectorAll(".kun-alle").forEach((el) => { el.hidden = tilstand.modus !== "alle"; });
-    document.querySelectorAll(".kun-eiendom").forEach((el) => { el.hidden = tilstand.modus === "dekning"; });
+    document.querySelectorAll(".kun-eiendom").forEach((el) => { el.hidden = egenFane; });
     document.querySelectorAll(".kun-dekning").forEach((el) => { el.hidden = tilstand.modus !== "dekning"; });
+    document.querySelectorAll(".kun-skolekap").forEach((el) => { el.hidden = tilstand.modus !== "skolekap"; });
+    document.getElementById("kartlag-seksjon").hidden = tilstand.modus === "skolekap";
     if (tilstand.modus === "dekning" && !tilstand.formal) {
       const k = document.getElementById("lag-formal");
       if (k) { k.checked = true; tilstand.formal = true; document.getElementById("formal-innhold").hidden = false; }
     }
     plasserKartlag();
     if (window.Dekning) window.Dekning.modus(tilstand.modus === "dekning");
+    if (window.Skolekap) window.Skolekap.modus(tilstand.modus === "skolekap");
     oppdaterPunkter();
   }
 
@@ -660,7 +664,7 @@
     if (tilstand.modus === "alle" && tilstand.fargelegging === "hovedbruk") {
       html += `<p class="tf-tittel">Eiendommer etter hovedbruk</p>` +
         Object.values(HOVEDBRUK).map((h) => rute(h.farge, h.navn)).join("");
-    } else if (tilstand.modus !== "dekning") {
+    } else if (tilstand.modus === "alle" || tilstand.modus === "tomter") {
       html += `<p class="tf-tittel">Eiendommer etter forvalter</p>` +
         FORVALTER_REKKEFOLGE.map((k) => rute(FORVALTER[k].farge, FORVALTER[k].navn)).join("");
       if (tilstand.modus === "tomter") html += rute(FARGE.morkBeige, "Annen kommunal eiendom", FARGE.morkBeige);
@@ -671,6 +675,7 @@
       if (formal.length) html += `<p class="tf-tittel">Formål og anlegg</p>` + formal.map((f) => sirkel(FORMAL[f].farge, FORMAL[f].navn)).join("");
     }
     if (window.Dekning && tilstand.modus === "dekning") html = window.Dekning.tegnforklaring() + html;
+    if (window.Skolekap && tilstand.modus === "skolekap") html = window.Skolekap.tegnforklaring();
     el.innerHTML = html;
     el.hidden = !html;
   }
@@ -732,7 +737,10 @@
       document.getElementById(id).addEventListener("change", (e) => { tilstand[id] = e.target.checked; oppdater(); });
     });
 
-    const faner = { alle: document.getElementById("fane-alle"), tomter: document.getElementById("fane-tomter"), dekning: document.getElementById("fane-dekning") };
+    const faner = {
+      alle: document.getElementById("fane-alle"), tomter: document.getElementById("fane-tomter"),
+      dekning: document.getElementById("fane-dekning"), skolekap: document.getElementById("fane-skolekap")
+    };
     Object.entries(faner).forEach(([modus, knapp]) => {
       knapp.addEventListener("click", () => {
         if (tilstand.modus === modus) return;
@@ -789,7 +797,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=10`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=11`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
@@ -815,9 +823,13 @@
         }).map((f) => ({ p: f.properties, ...midtpunkt(f.geometry) }))
       };
       if (window.Dekning) window.Dekning.start(window.Oslokart);
+      if (window.Skolekap) window.Skolekap.start(window.Oslokart);
       oppdater();
       const ledig = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
-      ledig(() => { if (window.Dekning) window.Dekning.forhaand(); });
+      ledig(() => {
+        if (window.Dekning) window.Dekning.forhaand();
+        if (window.Skolekap) window.Skolekap.forhaand();
+      });
     })
     .catch(() => {
       document.getElementById("toppliste").innerHTML = '<li class="tom">Klarte ikke å laste dataene.</li>';

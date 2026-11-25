@@ -68,6 +68,19 @@ Fanen finner områder der brukerne bor for langt fra et tilbud, eller der tilbud
 - **Ruter:** Brukerne i en rute regnes fra rutens midtpunkt.
 - **Videregående skoler** mangler elevtall i skoleregisteret.
 
+### Skolekapasitet – fyllingsgrad per barneskolekrets
+
+Fanen farger de 105 barneskolekretsene etter hvor fulle skolene er, i dag eller framskrevet til 2030, 2035, 2040 eller 2050.
+
+- **Kapasitet:** legges inn per krets i nettleseren, i listen eller i kretsens popup. Tallene lagres bare i nettleseren (localStorage) og publiseres aldri. Med «Last ned CSV» og «Last inn CSV» kan de tas vare på og deles. Filen trenger kolonnene `krets` (eller `skole`) og `kapasitet`. Kolonnen `elever_i_dag_overstyrt` er valgfri.
+- **Elever i dag:** elevtallet i Udirs skoleregister. For skoler med både barne- og ungdomstrinn anslås barnetrinnet ut fra antall trinn (merket med *). Elevtallet kan overstyres per krets.
+- **Framskriving:** dagens elevtall ganget med endringen i antall barn 6–12 år som bor i kretsen. Barna fordeles på kretsene etter boligene, med samme befolkningsgrunnlag og framskriving som i Dekningsgrad.
+- **Farger:** grønn, gul og rød etter fyllingsgrad (elever delt på kapasitet). Grensene kan justeres. Fra og med siste grense er kretsen mørk blå (overfylt).
+
+**Kilde og bygging:** Grensene er barneskolekretsene fra Plan- og bygningsetatens skolekart (juni 2026). `scripts/bygg_skolekretser.py` tar bare med geometri, kretsnavn og skolenavn, og kobler skolene til Udir på navn. Ungdomsskolekretser er ikke med.
+
+**Forbehold:** Elevene på en skole bor ikke nødvendigvis i kretsen (skolebytte, privatskoler, spesialskoler). Framskrivingen er fordelt fra delbydel til krets og er usikker for små kretser.
+
 ## Kilder
 
 | Data | Kilde | Lisens |

@@ -6,7 +6,7 @@
 <title>Kommunale tomter i Oslo</title>
 <meta name="description" content="Kart over eiendommer Oslo kommune eier, koblet mot matrikkelen. Finn ubebygde tomter og slå opp regulering i Planinnsyn.">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <div class="app">
@@ -21,6 +21,7 @@
       <button role="tab" id="fane-alle" class="fane aktiv" aria-selected="true">Alle eiendommer</button>
       <button role="tab" id="fane-tomter" class="fane" aria-selected="false">Ubebygde tomter</button>
       <button role="tab" id="fane-dekning" class="fane" aria-selected="false">Dekningsgrad</button>
+      <button role="tab" id="fane-skolekap" class="fane" aria-selected="false">Skolekapasitet</button>
     </div>
     </div>
 
@@ -108,6 +109,50 @@
       </div>
     </section>
 
+    <section class="skolekap kun-skolekap" hidden>
+      <p class="dk-ingress">Se hvor fulle barneskolene er, i dag og framover. Skriv inn kapasiteten per skole, så farges skolekretsen etter fyllingsgrad.</p>
+      <p class="dk-status" id="sk-status">Laster skolekretser …</p>
+      <div id="sk-innhold" hidden>
+        <div class="rad">
+          <label class="felt"><span>Elevtall</span>
+            <select id="sk-aar" disabled><option value="">I dag</option></select>
+          </label>
+          <label class="felt"><span>Sorter listen</span>
+            <select id="sk-sortering">
+              <option value="fylling">Fyllingsgrad</option>
+              <option value="navn">Navn</option>
+            </select>
+          </label>
+        </div>
+        <fieldset class="felt sk-terskler">
+          <legend>Fargegrenser for fyllingsgrad</legend>
+          <div class="sk-terskel-rad">
+            <label><span><i style="background:#4ef8b6"></i>Grønn under</span><span><input type="number" id="sk-t1" min="1" max="300" step="1"> %</span></label>
+            <label><span><i style="background:#f9c66b"></i>Gul under</span><span><input type="number" id="sk-t2" min="1" max="300" step="1"> %</span></label>
+            <label><span><i style="background:#ff8274"></i>Rød under</span><span><input type="number" id="sk-t3" min="1" max="300" step="1"> %</span></label>
+          </div>
+          <p class="lagmerknad">Fra og med siste grense: mørk blå (overfylt).</p>
+          <p class="lagmerknad sk-feil" id="sk-terskel-feil" aria-live="polite"></p>
+        </fieldset>
+        <label class="avkryss"><input type="checkbox" id="sk-vis-skoler" checked> Vis skolene i kartet</label>
+        <section class="nokkeltall sk-tall" id="sk-tall" aria-live="polite"></section>
+        <div class="liste-topp sk-liste-topp">
+          <h2>Kretser</h2>
+          <span class="sk-kolonner"><span>Elever</span><span>Kapasitet</span><span>Fylling</span></span>
+        </div>
+        <ol class="sk-liste" id="sk-liste"></ol>
+        <div class="sk-filer">
+          <button type="button" class="lenkeknapp" id="sk-last-ned">Last ned CSV</button>
+          <button type="button" class="lenkeknapp" id="sk-last-inn">Last inn CSV</button>
+          <button type="button" class="lenkeknapp" id="sk-nullstill">Fjern all kapasitet</button>
+          <input type="file" id="sk-fil" accept=".csv,text/csv,text/plain" hidden>
+        </div>
+        <p class="lagmerknad" id="sk-fil-status" aria-live="polite"></p>
+        <p class="lagmerknad">Kapasiteten lagres bare i denne nettleseren og deles ikke. Bruk CSV-filen for å ta vare på tallene eller dele dem. Filen trenger kolonnene «krets» (eller «skole») og «kapasitet».</p>
+        <p class="lagmerknad" id="sk-kilde"></p>
+      </div>
+    </section>
+
     <section class="filter kun-eiendom">
       <label class="felt">
         <span>Søk på adresse eller gnr/bnr</span>
@@ -169,7 +214,7 @@
 
     <footer class="fot">
       <p><strong>Uoffisiell oversikt.</strong> Laget av åpne data, ikke et produkt fra Oslo kommune. Sjekk alltid regulering i Planinnsyn og eierforhold i Eiendomsregisteret.</p>
-      <p>Kilder: <a href="https://www.oslo.kommune.no/plan-bygg-og-eiendom/kart-og-eiendomsinformasjon/kommunal-eiendom/eiendomsoversikt">Oslo kommunes eiendomsoversikt</a> (<span id="kilde-dato">oktober 2026</span>), Kartverket – Matrikkelen (CC BY 4.0), Udir – Nasjonalt skoleregister og barnehageregister (NLOD), Anleggsregisteret (idrettsanlegg.no), bydelsgrenser fra Oslo kommune/Bydelsfakta (MIT). <a href="https://github.com/Kvelliken/oslokart">Kode og metode</a>.</p>
+      <p>Kilder: <a href="https://www.oslo.kommune.no/plan-bygg-og-eiendom/kart-og-eiendomsinformasjon/kommunal-eiendom/eiendomsoversikt">Oslo kommunes eiendomsoversikt</a> (<span id="kilde-dato">oktober 2026</span>), Kartverket – Matrikkelen (CC BY 4.0), Udir – Nasjonalt skoleregister og barnehageregister (NLOD), Anleggsregisteret (idrettsanlegg.no), bydelsgrenser fra Oslo kommune/Bydelsfakta (MIT), skolekretser fra Plan- og bygningsetaten, Oslo kommune. <a href="https://github.com/Kvelliken/oslokart">Kode og metode</a>.</p>
     </footer>
     </div>
   </aside>
@@ -182,7 +227,8 @@
 </div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="dekning.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="dekning.js?v=11"></script>
+<script src="skolekap.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
