@@ -127,9 +127,17 @@ def hent_skoler(sted):
              and (e.get("ErGrunnopplaering") or e.get("ErGrunnskole") or e.get("ErVideregaaendeSkole") or e.get("ErSpesialskole"))]
     print(f"NSR: {len(liste)} enheter i Oslo, {len(valgt)} aktive skoler i grunnopplæringen")
     ut = []
+    uten = []
     for d in detaljer(NSR, valgt):
         lat, lon = koordinat(d)
-        if lat is None or not er_skole_i_oslo(d):
+        if not er_skole_i_oslo(d):
+            continue
+        if lat is None:
+            # Uten (gyldig) koordinat i NSR: vises ikke i kartet, men elevtallet trengs i Skolekapasitet
+            if d.get("SkoletrinnGSFra"):
+                uten.append({"o": d["Organisasjonsnummer"], "n": d.get("Navn") or d.get("FulltNavn"),
+                             "a": adresse(d), "u": skoletype(d), "ei": skole_eier(d), "et": d.get("Elevtall"),
+                             "gf": d.get("SkoletrinnGSFra"), "gt": d.get("SkoletrinnGSTil")})
             continue
         ut.append({
             "o": d["Organisasjonsnummer"],
@@ -145,7 +153,10 @@ def hent_skoler(sted):
             "w": nettside(d),
             **sted.slaa_opp(lon, lat),
         })
-    return ut
+    uten.sort(key=lambda p: p["n"] or "")
+    if uten:
+        print("Skoler uten koordinat i NSR:", ", ".join(p["n"] for p in uten))
+    return ut, uten
 
 
 def barnehage_eier(d):
@@ -194,9 +205,9 @@ def hent_barnehager(sted):
     return ut
 
 
-def skriv(navn, poster, kilde):
+def skriv(navn, poster, kilde, **ekstra):
     poster.sort(key=lambda p: p["n"] or "")
-    data = {"kilde": kilde, "hentet": date.today().isoformat(), "antall": len(poster), "poster": poster}
+    data = {"kilde": kilde, "hentet": date.today().isoformat(), "antall": len(poster), "poster": poster, **ekstra}
     with open(OUT / navn, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"Skrev {navn}: {len(poster)} poster")
@@ -204,7 +215,8 @@ def skriv(navn, poster, kilde):
 
 def main():
     sted = Stedsoppslag(OUT / "eiendommer.geojson", ROOT / "data" / "bydeler.geojson")
-    skriv("skoler.json", hent_skoler(sted), "Udir, Nasjonalt skoleregister (NLOD)")
+    skoler, uten = hent_skoler(sted)
+    skriv("skoler.json", skoler, "Udir, Nasjonalt skoleregister (NLOD)", uten_plassering=uten)
     skriv("barnehager.json", hent_barnehager(sted), "Udir, Nasjonalt barnehageregister (NLOD)")
 
 
