@@ -374,11 +374,13 @@
       rader = `<dt>Kategori</dt><dd>${esc(p.u)}</dd><dt>Antall bygg</dt><dd>${d.n}</dd>`;
     }
     const adresse = d.a ? `<dt>Adresse</dt><dd>${esc(d.a)}</dd>` : "";
+    const plassering = d.kp ? '<p class="merk">Plassert etter adressen i Kartverkets adresseregister, fordi skoleregisteret mangler koordinat.</p>' : "";
     const nett = d.w ? `<div class="lenker"><a href="${esc(d.w)}" target="_blank" rel="noopener">Nettside</a></div>` : "";
     const kilde = `${F.kilde}${hentet[p.f] ? ", hentet " + dato(hentet[p.f]) : ""}.${F.merknad ? " " + F.merknad : ""}`;
     return `<h3><span class="sirkel" style="background:${F.farge}"></span>${esc(p.n)}</h3>
       <p class="under">${under}</p>
       <dl>${rader}${adresse}${p.b ? `<dt>Bydel</dt><dd>${esc(p.b)}</dd>` : ""}</dl>
+      ${plassering}
       ${eiendomLinje(p)}
       ${window.Dekning && tilstand.modus === "dekning" ? window.Dekning.punktInfo(p) : ""}
       ${nett}
@@ -797,7 +799,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=11`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=12`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);

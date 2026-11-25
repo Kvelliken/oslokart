@@ -12,6 +12,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
+import re
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from geo import Stedsoppslag
@@ -56,6 +58,35 @@ def koordinat(d):
 
 
 OSLO_KOMMUNE = "958935420"
+ADRESSER = "https://ws.geonorge.no/adresser/v1/sok"
+
+
+def adressepunkt(d):
+    """Koordinat fra Kartverkets adresseregister når NSR mangler koordinat.
+    Prøver hele adressen først, deretter uten husnummerintervall («160-162» → «160»)."""
+    a = adresse(d)
+    if not a:
+        return None, None
+    postnr = ((d.get("Beliggenhetsadresse") or {}).get("Postnummer") or "").strip()
+    forsok = [a]
+    kort = re.sub(r"(\d+)\s*-\s*\d+\w*", r"\1", a)
+    if kort != a:
+        forsok.append(kort)
+    for tekst in forsok:
+        for medPost in ([True, False] if postnr else [False]):
+            url = (f"{ADRESSER}?sok={quote(tekst)}&kommunenummer={KOMMUNE}&treffPerSide=1&utkoordsys=4258"
+                   + (f"&postnummer={postnr}" if medPost else ""))
+            try:
+                treff = hent(url, forsok=2).get("adresser") or []
+            except Exception as e:  # noqa: BLE001
+                print(f"  adresseoppslag feilet for {a}: {e}", file=sys.stderr)
+                return None, None
+            if treff:
+                pkt = treff[0]["representasjonspunkt"]
+                s, n, v, o = OSLO_BOKS
+                if s <= pkt["lat"] <= n and v <= pkt["lon"] <= o:
+                    return round(pkt["lat"], 6), round(pkt["lon"], 6)
+    return None, None
 
 
 def relasjon(d, typeid):
@@ -132,8 +163,14 @@ def hent_skoler(sted):
         lat, lon = koordinat(d)
         if not er_skole_i_oslo(d):
             continue
+        fra_adresse = False
         if lat is None:
-            # Uten (gyldig) koordinat i NSR: vises ikke i kartet, men elevtallet trengs i Skolekapasitet
+            lat, lon = adressepunkt(d)
+            fra_adresse = lat is not None
+            if fra_adresse:
+                print(f"  Plassert etter adressen: {d.get('Navn')} ({adresse(d)})")
+        if lat is None:
+            # Verken koordinat i NSR eller treff på adressen: vises ikke i kartet, men elevtallet trengs i Skolekapasitet
             if d.get("SkoletrinnGSFra"):
                 uten.append({"o": d["Organisasjonsnummer"], "n": d.get("Navn") or d.get("FulltNavn"),
                              "a": adresse(d), "u": skoletype(d), "ei": skole_eier(d), "et": d.get("Elevtall"),
@@ -151,11 +188,12 @@ def hent_skoler(sted):
             "gf": d.get("SkoletrinnGSFra"), "gt": d.get("SkoletrinnGSTil"),
             "vf": d.get("SkoletrinnVGSFra"), "vt": d.get("SkoletrinnVGSTil"),
             "w": nettside(d),
+            **({"kp": 1} if fra_adresse else {}),
             **sted.slaa_opp(lon, lat),
         })
     uten.sort(key=lambda p: p["n"] or "")
     if uten:
-        print("Skoler uten koordinat i NSR:", ", ".join(p["n"] for p in uten))
+        print("Skoler uten plassering (verken i NSR eller adresseregisteret):", ", ".join(p["n"] for p in uten))
     return ut, uten
 
 

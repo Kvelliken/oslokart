@@ -39,7 +39,7 @@
 
   function last() {
     if (lasting) return lasting;
-    lasting = Promise.all([hent("data/skolekretser.geojson?v=11"), hent("data/skoler.json?v=11")])
+    lasting = Promise.all([hent("data/skolekretser.geojson?v=12"), hent("data/skoler.json?v=12")])
       .then(([gj, sk]) => {
         hentetUdir = sk.hentet;
         const perOrgnr = new Map();
