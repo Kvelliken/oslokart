@@ -43,7 +43,7 @@ WCS = "https://hoydedata.no/arcgis/services/las_dtm_somlos/ImageServer/WCSServer
 KILDE = "Kartverket, Høyde DTM (laserdata), CC BY 4.0"
 GRENSER = (10, 25)          # helning i prosent
 KJERNE_RADIUS = 10          # samme som i bygg_tomtform.py
-MAKS_RUTER = 2500           # bredde/høyde i ruter per forespørsel
+MAKS_RUTER = 1500           # bredde/høyde i ruter per forespørsel
 RETNINGER = ["N", "NØ", "Ø", "SØ", "S", "SV", "V", "NV"]
 COVERAGE = None             # finnes ved første vellykkede kall
 
@@ -58,9 +58,9 @@ def hent_dtm(x0, y0, x1, y1, opp):
         q = {"service": "WCS", "version": "1.0.0", "request": "GetCoverage", "coverage": cov,
              "crs": "EPSG:25833", "bbox": f"{x0},{y0},{x1},{y1}", "width": w, "height": h,
              "format": "GeoTIFF"}
-        for forsok in range(4):
+        for forsok in range(3):
             try:
-                with urlopen(Request(f"{WCS}?{urlencode(q)}", headers={"User-Agent": "oslokart"}), timeout=120) as r:
+                with urlopen(Request(f"{WCS}?{urlencode(q)}", headers={"User-Agent": "oslokart"}), timeout=45) as r:
                     data = r.read()
                 if data[:4] in (b"II*\x00", b"MM\x00*"):
                     COVERAGE = cov
@@ -122,6 +122,14 @@ def analyser(geom):
     }
 
 
+def lagre(resultat, med):
+    gyldige = {e: v for e, v in resultat.items() if v is not None and e in med}
+    UT.write_text(json.dumps({"kilde": KILDE, "hentet": date.today().isoformat(), "grenser": list(GRENSER),
+                              "kjerne_bredde": 2 * KJERNE_RADIUS, "tomter": gyldige},
+                             ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return gyldige
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--alle", action="store_true", help="regn alle tomter på nytt")
@@ -149,6 +157,8 @@ def main():
         except Exception as ex:  # noqa: BLE001
             sys.exit(f"Første forespørsel feilet: {ex}")
         print(f"Coverage: {COVERAGE}")
+    med = set(utvalg["e"])
+    start = time.time()
     with ThreadPoolExecutor(max_workers=6) as pool:
         jobber = {pool.submit(analyser, geom): e for e, geom in rader[1:]}
         for i, f in enumerate(as_completed(jobber), 1):
@@ -158,13 +168,14 @@ def main():
             except Exception as ex:  # noqa: BLE001
                 feil.append(e)
                 print(f"  {e}: {ex}", file=sys.stderr)
-            if i % 200 == 0:
-                print(f"  {i}/{len(rader) - 1}")
-    gyldige = {e: v for e, v in resultat.items() if v is not None and e in set(utvalg["e"])}
-    UT.write_text(json.dumps({"kilde": KILDE, "hentet": date.today().isoformat(), "grenser": list(GRENSER),
-                              "kjerne_bredde": 2 * KJERNE_RADIUS, "tomter": gyldige},
-                             ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            if i % 100 == 0:
+                print(f"  {i}/{len(rader) - 1}, {len(feil)} feil, {time.time() - start:.0f} s", flush=True)
+            if i % 500 == 0:
+                lagre(resultat, med)
+    gyldige = lagre(resultat, set(utvalg["e"]))
     print(f"{len(gyldige)} tomter med terreng → {UT.relative_to(ROT)} ({UT.stat().st_size // 1024} kB). Feil: {len(feil)}")
+    if feil:
+        print("Feilet:", ", ".join(feil[:50]))
     if feil and len(feil) > len(rader) * 0.1:
         sys.exit("Mer enn 10 % av forespørslene feilet")
 

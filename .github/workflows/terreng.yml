@@ -24,7 +24,7 @@ concurrency:
 jobs:
   hent:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -36,10 +36,13 @@ jobs:
         run: pip install geopandas pyogrio shapely numpy rasterio
 
       - name: Hent terreng og regn helning
-        run: python scripts/hent_terreng.py ${{ inputs.alle && '--alle' || '' }} --maks ${{ inputs.maks }}
+        timeout-minutes: 120
+        continue-on-error: true
+        run: python -u scripts/hent_terreng.py ${{ inputs.alle && '--alle' || '' }} --maks ${{ inputs.maks }}
 
-      - name: Lagre endringer
+      - name: Lagre endringer (også det som ble hentet før et eventuelt avbrudd)
         id: lagre
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
