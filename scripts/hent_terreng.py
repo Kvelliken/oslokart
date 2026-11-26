@@ -35,6 +35,7 @@ import numpy as np
 import rasterio
 import shapely
 from rasterio.features import geometry_mask
+from rasterio.transform import from_origin
 
 ROT = Path(__file__).resolve().parent.parent
 INN = ROT / "docs" / "data" / "eiendommer.geojson"
@@ -60,7 +61,7 @@ def hent_dtm(x0, y0, x1, y1, opp):
              "format": "GeoTIFF"}
         for forsok in range(3):
             try:
-                with urlopen(Request(f"{WCS}?{urlencode(q)}", headers={"User-Agent": "oslokart"}), timeout=45) as r:
+                with urlopen(Request(f"{WCS}?{urlencode(q)}", headers={"User-Agent": "oslokart"}), timeout=90) as r:
                     data = r.read()
                 if data[:4] in (b"II*\x00", b"MM\x00*"):
                     COVERAGE = cov
@@ -83,7 +84,10 @@ def analyser(geom):
     with rasterio.open(io.BytesIO(hent_dtm(x0, y0, x1, y1, opp))) as ds:
         z = ds.read(1).astype("float64")
         nodata = ds.nodata
-        transform = ds.transform
+    # Georeferansen settes ut fra forespørselen; enkelte svar mangler den
+    transform = from_origin(x0, y1, opp, opp)
+    if z.shape != (int(round((y1 - y0) / opp)), int(round((x1 - x0) / opp))):
+        raise RuntimeError(f"Uventet størrelse {z.shape}")
     ugyldig = ~np.isfinite(z) | (z < -50) | (z > 3000)
     if nodata is not None:
         ugyldig |= z == nodata
