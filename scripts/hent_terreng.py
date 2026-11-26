@@ -45,6 +45,8 @@ KILDE = "Kartverket, Høyde DTM (laserdata), CC BY 4.0"
 GRENSER = (10, 25)          # helning i prosent
 KJERNE_RADIUS = 10          # samme som i bygg_tomtform.py
 MAKS_RUTER = 1500           # bredde/høyde i ruter per forespørsel
+RUTE = 1000                 # tomter som får plass hentes samlet i ruter på 1 × 1 km
+MARGIN = 100                # med så mye margin rundt ruten (m)
 RETNINGER = ["N", "NØ", "Ø", "SØ", "S", "SV", "V", "NV"]
 COVERAGE = None             # finnes ved første vellykkede kall
 
@@ -74,20 +76,48 @@ def hent_dtm(x0, y0, x1, y1, opp):
     raise RuntimeError(f"Fikk ikke GeoTIFF: {siste!r}")
 
 
-def analyser(geom):
+def boks(geom):
     x0, y0, x1, y1 = geom.bounds
-    x0, y0 = math.floor(x0) - 2, math.floor(y0) - 2
-    x1, y1 = math.ceil(x1) + 2, math.ceil(y1) + 2
-    opp = 1
-    while max(x1 - x0, y1 - y0) / opp > MAKS_RUTER:
-        opp *= 2
+    return math.floor(x0) - 2, math.floor(y0) - 2, math.ceil(x1) + 2, math.ceil(y1) + 2
+
+
+def les_dtm(x0, y0, x1, y1, opp):
     with rasterio.open(io.BytesIO(hent_dtm(x0, y0, x1, y1, opp))) as ds:
         z = ds.read(1).astype("float64")
         nodata = ds.nodata
     # Georeferansen settes ut fra forespørselen; enkelte svar mangler den
-    transform = from_origin(x0, y1, opp, opp)
     if z.shape != (int(round((y1 - y0) / opp)), int(round((x1 - x0) / opp))):
         raise RuntimeError(f"Uventet størrelse {z.shape}")
+    if nodata is not None:
+        z[z == nodata] = np.nan
+    return z
+
+
+def analyser(geom):
+    """Henter terrenget for én tomt og regner ut verdiene."""
+    x0, y0, x1, y1 = boks(geom)
+    opp = 1
+    while max(x1 - x0, y1 - y0) / opp > MAKS_RUTER:
+        opp *= 2
+    return beregn(les_dtm(x0, y0, x1, y1, opp), x0, y1, opp, geom)
+
+
+def analyser_rute(kx, ky, tomter):
+    """Henter én rute (med margin) og regner ut alle tomtene som ligger i den."""
+    rx0, ry0 = kx * RUTE - MARGIN, ky * RUTE - MARGIN
+    rx1, ry1 = (kx + 1) * RUTE + MARGIN, (ky + 1) * RUTE + MARGIN
+    Z = les_dtm(rx0, ry0, rx1, ry1, 1)
+    ut = {}
+    for e, geom in tomter:
+        x0, y0, x1, y1 = boks(geom)
+        r0, c0 = ry1 - y1, x0 - rx0
+        ut[e] = beregn(Z[r0:r0 + (y1 - y0), c0:c0 + (x1 - x0)].copy(), x0, y1, 1, geom)
+    return ut
+
+
+def beregn(z, x0, y1, opp, geom):
+    transform = from_origin(x0, y1, opp, opp)
+    nodata = None
     ugyldig = ~np.isfinite(z) | (z < -50) | (z > 3000)
     if nodata is not None:
         ugyldig |= z == nodata
@@ -151,32 +181,50 @@ def main():
         nye = nye.head(arg.maks)
     print(f"{len(utvalg)} tomter i utvalget, {len(gammel)} beregnet fra før, {len(nye)} skal hentes")
 
-    # Første kall alene, så coverage-navnet blir funnet før parallell henting
     resultat, feil = dict(gammel), []
-    rader = list(nye[["e", "geometry"]].itertuples(index=False))
-    if rader:
-        e, geom = rader[0]
-        try:
-            resultat[e] = analyser(geom)
-        except Exception as ex:  # noqa: BLE001
-            sys.exit(f"Første forespørsel feilet: {ex}")
-        print(f"Coverage: {COVERAGE}")
     med = set(utvalg["e"])
+    rader = list(nye[["e", "geometry"]].itertuples(index=False))
+    ruter, enkeltvis = {}, []
+    for e, geom in rader:
+        x0, y0, x1, y1 = boks(geom)
+        kx, ky = int((x0 + 2) // RUTE), int((y0 + 2) // RUTE)
+        if x0 >= kx * RUTE - MARGIN and y0 >= ky * RUTE - MARGIN and \
+                x1 <= (kx + 1) * RUTE + MARGIN and y1 <= (ky + 1) * RUTE + MARGIN:
+            ruter.setdefault((kx, ky), []).append((e, geom))
+        else:
+            enkeltvis.append((e, geom))
+    oppgaver = [("rute", k, v) for k, v in ruter.items()] + [("tomt", e, g) for e, g in enkeltvis]
+    print(f"{len(ruter)} ruter og {len(enkeltvis)} store tomter hentes enkeltvis", flush=True)
+    if not oppgaver:
+        lagre(resultat, med)
+        return
+
+    def kjor(o):
+        if o[0] == "rute":
+            return analyser_rute(o[1][0], o[1][1], o[2])
+        return {o[1]: analyser(o[2])}
+
+    # Første kall alene, så coverage-navnet blir funnet før parallell henting
+    try:
+        resultat.update(kjor(oppgaver[0]))
+    except Exception as ex:  # noqa: BLE001
+        sys.exit(f"Første forespørsel feilet: {ex}")
+    print(f"Coverage: {COVERAGE}", flush=True)
     start = time.time()
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        jobber = {pool.submit(analyser, geom): e for e, geom in rader[1:]}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        jobber = {pool.submit(kjor, o): o for o in oppgaver[1:]}
         for i, f in enumerate(as_completed(jobber), 1):
-            e = jobber[f]
+            o = jobber[f]
             try:
-                resultat[e] = f.result()
+                resultat.update(f.result())
             except Exception as ex:  # noqa: BLE001
-                feil.append(e)
-                print(f"  {e}: {ex}", file=sys.stderr)
-            if i % 100 == 0:
-                print(f"  {i}/{len(rader) - 1}, {len(feil)} feil, {time.time() - start:.0f} s", flush=True)
-            if i % 500 == 0:
+                tapt = [e for e, _ in o[2]] if o[0] == "rute" else [o[1]]
+                feil.extend(tapt)
+                print(f"  {o[0]} {o[1]}: {ex}", file=sys.stderr)
+            if i % 20 == 0:
+                print(f"  {i}/{len(oppgaver) - 1} oppgaver, {len(feil)} tomter feilet, {time.time() - start:.0f} s", flush=True)
                 lagre(resultat, med)
-    gyldige = lagre(resultat, set(utvalg["e"]))
+    gyldige = lagre(resultat, med)
     print(f"{len(gyldige)} tomter med terreng → {UT.relative_to(ROT)} ({UT.stat().st_size // 1024} kB). Feil: {len(feil)}")
     if feil:
         print("Feilet:", ", ".join(feil[:50]))
