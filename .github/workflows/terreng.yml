@@ -1,0 +1,61 @@
+name: Hent terreng for ubebygde tomter
+
+# Engangsjobb: startes manuelt. Henter bare tomter som ikke er beregnet fra før,
+# så den kan kjøres igjen når eiendomsoversikten får nye tomter.
+on:
+  workflow_dispatch:
+    inputs:
+      alle:
+        description: "Regn alle tomter på nytt"
+        type: boolean
+        default: false
+      maks:
+        description: "Høyst så mange nye tomter (0 = alle, til testing)"
+        default: "0"
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: terreng
+  cancel-in-progress: false
+
+jobs:
+  hent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer avhengigheter
+        run: pip install geopandas pyogrio shapely numpy rasterio
+
+      - name: Hent terreng og regn helning
+        run: python scripts/hent_terreng.py ${{ inputs.alle && '--alle' || '' }} --maks ${{ inputs.maks }}
+
+      - name: Lagre endringer
+        id: lagre
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/tomt_terreng.json
+          if git diff --cached --quiet; then
+            echo "Ingen endringer."
+            echo "endret=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Terreng for ubebygde tomter fra Kartverkets høydemodell ($(date +%F))"
+            git pull --rebase
+            git push
+            echo "endret=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bygg GitHub Pages på nytt
+        if: steps.lagre.outputs.endret == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages-bygg ble ikke startet."
