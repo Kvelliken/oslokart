@@ -8,8 +8,13 @@ Dette er en uoffisiell oversikt laget av åpne data. Den er ikke et produkt fra 
 
 ## Hva kartet viser
 
-- **Faner:** «Alle eiendommer» (startvisning), «Ubebygde tomter» og «Dekningsgrad».
+- **Faner:** «Alle eiendommer» (startvisning), «Ubebygde tomter», «Dekningsgrad» og «Skolekapasitet».
 - **Ubebygde tomter.** Kommunale eiendommer uten registrerte bygninger. Veigrunn og seksjoner er utelatt. Som standard utelates også Marka, uregistrert grunn og tomter med byggesak under arbeid. Alle tre kan slås på i filteret, og du kan velge å tillate garasjer, uthus og naust.
+- **Tomteboksen i «Ubebygde tomter»:** Klikk på en tomt for å se:
+  - **Brukbarhet:** form, bredde (største sirkel som får plass), ytre mål, areal der tomten er minst 20 m bred, og om den grenser til andre ubebygde kommunale tomter. Regnes av `scripts/bygg_tomtform.py`. Bare tomter minst 10 m brede, uten bygg og utenom veigrunn regnes som naboer, så vei- og grøntstriper ikke binder sammen hele byen.
+  - **Nærmeste tilbud, gange:** barneskole, ungdomsskole, barnehage, idrettshall, fotballbane og svømmeanlegg (alle eiere, uten spesialskoler og åpne barnehager), søkt inntil 5 km.
+  - **Personer innen 5, 10 og 15 minutters gange,** totalt og per aldersgruppe, bosatte i dag.
+  - Gangen regnes i nettleseren fra punkter langs tomtegrensen, langs gangnettet fra OpenStreetMap, med 5 km/t. Befolkningen er den samme som i Dekningsgrad, fordelt på boligene.
 - **Alle eiendommer.** Alle kommunale eiendommer, farget etter forvalter.
 - **Filtre:** forvalter, bydel, minste areal og søk på adresse eller gnr/bnr.
 - **Lenker per eiendom** til Planinnsyn, som viser regulering, kommuneplan og pågående saker, og til Eiendomsregisteret.
@@ -134,9 +139,10 @@ python scripts/bygg_data.py \
   --excel data/eiendomsoversikt-oktober-2026.xlsx \
   --teig data/raw/Basisdata_0301_Oslo_25833_MatrikkelenEiendomskartTeig_FGDB.gdb \
   --bygning data/raw/Basisdata_0301_Oslo_25833_MatrikkelenBygning_FGDB.gdb
+python scripts/bygg_tomtform.py
 ```
 
-Skriptet skriver `docs/data/eiendommer.geojson`, `docs/data/bygg_formal.json` og `docs/data/statistikk.json`. Siden publiseres fra mappen `docs/` med GitHub Pages.
+`bygg_data.py` skriver `docs/data/eiendommer.geojson`, `docs/data/bygg_formal.json` og `docs/data/statistikk.json`. `bygg_tomtform.py` bygger `docs/data/tomt_form.json` fra eiendomsflatene og må kjøres etterpå. Siden publiseres fra mappen `docs/` med GitHub Pages.
 
 **Idrettsanlegg:** Legg et nytt uttrekk i `data/idrettsanlegg.xlsx` og kjør `python scripts/bygg_idrett.py`.
 

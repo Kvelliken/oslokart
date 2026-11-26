@@ -208,6 +208,7 @@
       </dl>
       ${byggliste}
       ${merknader.map((m) => `<p class="merk">${esc(m)}</p>`).join("")}
+      ${tilstand.modus === "tomter" ? `<div class="tomt-info" data-e="${esc(p.e)}"${tomtCache.has(p.e) ? "" : " data-venter"}>${tomtCache.get(p.e) || '<p class="lagmerknad">Beregner brukbarhet og gangavstand …</p>'}</div>` : ""}
       <div class="lenker">
         <a href="${planinnsynLenke(p)}" target="_blank" rel="noopener">Se regulering i Planinnsyn</a>
         <a href="${eiendomsregisterLenke(p)}" target="_blank" rel="noopener">Se eiendommen i Eiendomsregisteret</a>
@@ -226,7 +227,7 @@
       style: () => ({ renderer }),
       onEachFeature: (f, lag) => {
         lagPerId.set(f.properties.i, lag);
-        lag.bindPopup(() => eiendomPopup(f.properties), { maxWidth: 340 });
+        lag.bindPopup(() => eiendomPopup(f.properties), { maxWidth: 340, maxHeight: 520, autoPanPadding: [20, 20] });
       }
     });
     flategruppe.addTo(kart);
@@ -257,6 +258,103 @@
     });
     if (tilstand.modus === "tomter") fram.forEach((l) => l.bringToFront());
   }
+
+  // ---------- Tomteboksen: brukbarhet og gangavstand ----------
+  const GANG_M_PER_MIN = 5000 / 60;            // 5 km/t
+  const GANGTIDER = [5, 10, 15];               // minutter
+  const SOK_MAKS = 5000;                       // lengste gangavstand det søkes etter anlegg (m)
+  const ALDER = [["0–5 år", [0, 1]], ["6–15 år", [2, 3]], ["16–66 år", [4, 5, 6, 7, 8, 9]], ["67 år +", [10, 11, 12]]];
+  const NAERMESTE = [
+    ["barneskole", "Barneskole", (p) => p.f === "skole" && p.u !== "Spesialskole" && p.d.gf && p.d.gf <= 7],
+    ["ungdomsskole", "Ungdomsskole", (p) => p.f === "skole" && p.u !== "Spesialskole" && p.d.gf && p.d.gf <= 10 && p.d.gt >= 8],
+    ["barnehage", "Barnehage", (p) => p.f === "barnehage" && p.u !== "Åpen barnehage"],
+    ["idrettshall", "Idrettshall", (p) => p.f === "idrett" && p.t === "Idrettshall"],
+    ["fotballbane", "Fotballbane", (p) => p.f === "idrett" && p.u === "Fotballanlegg" && /^Fotballbane/.test(p.t)],
+    ["svomming", "Svømmeanlegg", (p) => p.f === "idrett" && p.u === "Svømme- og stupeanlegg"]
+  ];
+  let tomtForm = null;
+  const tomtCache = new Map();   // ferdig HTML per eiendom, så boksen kan tegnes på nytt uten ny beregning
+  let maalCache = null;
+  const lastTomtForm = () => tomtForm || (tomtForm = hentJson("data/tomt_form.json?v=13").catch(() => null));
+
+  function brukbarhetHtml(p, tf) {
+    const t = tf && tf.tomter[p.e];
+    if (!t) return "";
+    const andel = p.m2 > 0 ? Math.min(100, Math.round(t.k / p.m2 * 100)) : 0;
+    const form = t.b < 10 ? "Smal stripe, lite egnet for bygg"
+      : andel < 50 ? "Uregelmessig, store deler er smalere enn " + tf.kjerne_bredde + " m"
+      : t.w > 0 && t.l / t.w > 3 ? "Langstrakt"
+      : "Kompakt";
+    const gr = t.g != null ? tf.grupper[t.g] : null;
+    const nabo = gr && gr[0] > 1
+      ? `Grenser til ${fmt.format(gr[0] - 1)} ${gr[0] === 2 ? "annen ubebygd kommunal tomt" : "andre ubebygde kommunale tomter"}, til sammen ${arealKort(gr[1])}.`
+      : "Grenser ikke til andre ubebygde kommunale tomter.";
+    return `<p class="mellomtittel">Brukbarhet</p>
+      <dl>
+        <dt>Form</dt><dd>${form}</dd>
+        <dt>Bredde</dt><dd>Inntil ${fmt.format(t.b)} m</dd>
+        <dt>Ytre mål</dt><dd>Ca. ${fmt.format(t.l)} × ${fmt.format(t.w)} m</dd>
+        <dt>Minst ${tf.kjerne_bredde} m bred</dt><dd>${m2(t.k)} (${andel} %)</dd>
+      </dl>
+      <p class="lagmerknad">${esc(nabo)} Bredden er den største sirkelen som får plass i tomten.</p>`;
+  }
+
+  // Punkter på tomtegrensen (høyst ca. 60) som startpunkter for gangberegningen
+  function grensepunkter(g) {
+    const flater = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+    const alle = [];
+    flater.forEach((f) => f[0].forEach(([lon, lat]) => alle.push({ lat, lon })));
+    const steg = Math.max(1, Math.floor(alle.length / 60));
+    const ut = alle.filter((_, i) => i % steg === 0);
+    ut.push(midtpunkt(g));
+    return ut;
+  }
+
+  function maalForAnlegg() {
+    if (maalCache) return maalCache;
+    maalCache = {};
+    NAERMESTE.forEach(([k, , test]) => { maalCache[k] = punkter.filter(test); });
+    return maalCache;
+  }
+
+  const minutter = (m) => Math.max(1, Math.ceil(m / GANG_M_PER_MIN));
+  const avstandTekst = (m) => (m < 1000 ? `${fmt.format(Math.round(m / 10) * 10)} m` : `${fmt.format(Math.round(m / 100) / 10)} km`);
+
+  function gangHtml(r) {
+    const linjer = NAERMESTE.map(([k, navn]) => {
+      const b = r.naermest[k];
+      return `<dt>${navn}</dt><dd>${b ? `${avstandTekst(b.d)}, ${minutter(b.d)} min<br><span class="under">${esc(b.p.n)}</span>` : `Over ${avstandTekst(SOK_MAKS)}`}</dd>`;
+    }).join("");
+    const sum = (arr, idx) => idx.reduce((s, g) => s + arr[g], 0);
+    const rund = (x) => fmt.format(Math.round(x / 10) * 10);
+    const tabell = `<table class="tomt-personer"><thead><tr><th></th>${GANGTIDER.map((m) => `<th>${m} min</th>`).join("")}</tr></thead><tbody>
+      <tr class="sum"><th>Alle</th>${r.personer.map((p) => `<td>${rund(p.reduce((s, x) => s + x, 0))}</td>`).join("")}</tr>
+      ${ALDER.map(([navn, idx]) => `<tr><th>${navn}</th>${r.personer.map((p) => `<td>${rund(sum(p, idx))}</td>`).join("")}</tr>`).join("")}
+      </tbody></table>`;
+    return `<p class="mellomtittel">Nærmeste tilbud, gange</p><dl class="tomt-naermest">${linjer}</dl>
+      <p class="mellomtittel">Personer innen gangavstand</p>${tabell}
+      <p class="lagmerknad">Gange fra tomtegrensen langs gangnettet (OpenStreetMap), 5 km/t: 5 min ≈ 420 m, 10 min ≈ 830 m, 15 min = 1,25 km. Bosatte ${esc(r.aar)}, avrundet til nærmeste 10.</p>`;
+  }
+
+  function fyllTomtInfo(el, popup) {
+    const p = eiendomPerNokkel.get(el.dataset.e);
+    if (!p) return;
+    const f = data[p.i];
+    // Boksens innhold lages av eiendomPopup; update() tegner den på nytt med resultatet fra hurtigbufferen
+    Promise.all([
+      lastTomtForm(),
+      window.Dekning ? window.Dekning.gangFraTomt(grensepunkter(f.geometry), maalForAnlegg(),
+        GANGTIDER.map((m) => m * GANG_M_PER_MIN), SOK_MAKS) : Promise.resolve(null)
+    ]).then(([tf, r]) => {
+      tomtCache.set(p.e, brukbarhetHtml(p, tf) + (r ? gangHtml(r) : '<p class="lagmerknad">Gangavstand kunne ikke beregnes.</p>'));
+      if (popup && popup.isOpen()) popup.update();
+    });
+  }
+
+  kart.on("popupopen", (e) => {
+    const el = e.popup.getElement() && e.popup.getElement().querySelector(".tomt-info[data-venter]");
+    if (el) fyllTomtInfo(el, e.popup);
+  });
 
   // ---------- Kartlag: formål og anlegg ----------
   function lagPunkter(sett) {
@@ -799,7 +897,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=12`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=13`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
@@ -831,6 +929,7 @@
       ledig(() => {
         if (window.Dekning) window.Dekning.forhaand();
         if (window.Skolekap) window.Skolekap.forhaand();
+        lastTomtForm();
       });
     })
     .catch(() => {

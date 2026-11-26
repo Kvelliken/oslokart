@@ -72,7 +72,7 @@
 
   function last() {
     if (lasting) return lasting;
-    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=12"), hent("data/dekning_nett.json?v=12")])
+    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=13"), hent("data/dekning_nett.json?v=13")])
       .then(([g, n]) => {
         G = g; N = n;
         byggNett();
@@ -99,7 +99,7 @@
 
   function hentGeo(niva) {
     if (geo[niva]) return Promise.resolve(geo[niva]);
-    return hent(`data/omrader_${niva}.geojson?v=12`).then((g) => (geo[niva] = g));
+    return hent(`data/omrader_${niva}.geojson?v=13`).then((g) => (geo[niva] = g));
   }
 
   // ---------- Nett ----------
@@ -217,6 +217,59 @@
         if (wStempel[u] !== st || nd < wDist[u]) { wStempel[u] = st; wDist[u] = nd; hDytt(nd, u); }
       }
     }
+  }
+
+  // ---------- Gangavstand fra en tomt (brukes i tomteboksen) ----------
+  const anleggNode = new Map();
+  function nodeForAnlegg(p) {
+    let s = anleggNode.get(p.id);
+    if (!s) { s = naermesteNode(p.lat, p.lon); anleggNode.set(p.id, s); }
+    return s;
+  }
+
+  // Flerkilde-Dijkstra fra punktene på tomtegrensen, avgrenset til maks meter.
+  // maal: { nokkel: [anlegg] } → nærmeste anlegg per nøkkel. grenser: meter for persontelling.
+  function gangFraTomt(kilder, maal, grenser, maks) {
+    const { start, til, len, wDist: D, wStempel: S } = N;
+    const st = ++N.stempel;
+    hTom();
+    kilder.forEach((k) => {
+      const s = naermesteNode(k.lat, k.lon);
+      if (s.node < 0) return;
+      if (S[s.node] !== st || s.d < D[s.node]) { S[s.node] = st; D[s.node] = s.d; hDytt(s.d, s.node); }
+    });
+    while (HD.length) {
+      const v = hTa(), d = sisteD;
+      if (d > D[v]) continue;
+      for (let j = start[v]; j < start[v + 1]; j++) {
+        const u = til[j], nd = d + len[j];
+        if (nd > maks) continue;
+        if (S[u] !== st || nd < D[u]) { S[u] = st; D[u] = nd; hDytt(nd, u); }
+      }
+    }
+    const avstand = (node) => (S[node] === st ? D[node] : Infinity);
+    const naermest = {};
+    Object.entries(maal).forEach(([k, liste]) => {
+      let best = null;
+      liste.forEach((p) => {
+        const s = nodeForAnlegg(p);
+        if (s.node < 0) return;
+        const d = avstand(s.node) + s.d;
+        if (d <= maks && (!best || d < best.d)) best = { d, p };
+      });
+      naermest[k] = best;
+    });
+    // Personer innen hver grense, per aldersgruppe (13 grupper)
+    const personer = grenser.map(() => new Float64Array(13));
+    for (let i = 0; i < G.ep_node.length; i++) {
+      const d = avstand(G.ep_node[i]);
+      if (d > grenser[grenser.length - 1]) continue;
+      const a = G.omrader[G.ep_omrade[i]].a, w = G.ep_vekt[i];
+      grenser.forEach((x, gi) => {
+        if (d <= x) for (let g = 0; g < 13; g++) personer[gi][g] += a[g] * w;
+      });
+    }
+    return { naermest, personer, aar: G.aar.delbydel };
   }
 
   // ---------- Ruter ----------
@@ -720,6 +773,10 @@
     forhaand() { last(); },
     // Befolkningsgrunnlag og gangnett til andre faner (Skolekapasitet)
     grunnlag() { return last().then((ok) => (ok ? { G, N } : null)); },
+    // Gangavstand og personer rundt en tomt; laster grunnlaget ved behov
+    gangFraTomt(kilder, maal, grenser, maks) {
+      return last().then((ok) => (ok ? gangFraTomt(kilder, maal, grenser, maks) : null));
+    },
     punktInfo,
     tegnforklaring
   };
