@@ -72,7 +72,7 @@
 
   function last() {
     if (lasting) return lasting;
-    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=13"), hent("data/dekning_nett.json?v=13")])
+    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=14"), hent("data/dekning_nett.json?v=14")])
       .then(([g, n]) => {
         G = g; N = n;
         byggNett();
@@ -99,7 +99,7 @@
 
   function hentGeo(niva) {
     if (geo[niva]) return Promise.resolve(geo[niva]);
-    return hent(`data/omrader_${niva}.geojson?v=13`).then((g) => (geo[niva] = g));
+    return hent(`data/omrader_${niva}.geojson?v=14`).then((g) => (geo[niva] = g));
   }
 
   // ---------- Nett ----------

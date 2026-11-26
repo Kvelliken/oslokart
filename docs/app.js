@@ -273,9 +273,31 @@
     ["svomming", "Svømmeanlegg", (p) => p.f === "idrett" && p.u === "Svømme- og stupeanlegg"]
   ];
   let tomtForm = null;
+  let tomtTerreng = null;
+  const lastTomtTerreng = () => tomtTerreng || (tomtTerreng = hentJson("data/tomt_terreng.json?v=14").catch(() => null));
+  const RETNING_NAVN = { N: "nord", "NØ": "nordøst", "Ø": "øst", "SØ": "sørøst", S: "sør", SV: "sørvest", V: "vest", NV: "nordvest" };
+
+  function terrengHtml(p, tt) {
+    if (!tt) return "";
+    const t = tt.tomter[p.e];
+    if (!t) return `<p class="mellomtittel">Terreng</p><p class="lagmerknad">Ikke beregnet for denne tomten.</p>`;
+    const [g1, g2] = tt.grenser;
+    const desimal = (x) => fmt.format(Math.round(x * 10) / 10);
+    const beskriv = t.s < 5 ? "Nesten flat" : t.s < g1 ? "Slak" : t.s <= g2 ? "Middels bratt" : "Bratt";
+    return `<p class="mellomtittel">Terreng</p>
+      <dl>
+        <dt>Helning</dt><dd>${beskriv}, i snitt ${desimal(t.s)} %${t.r ? `, heller mot ${RETNING_NAVN[t.r]}` : ""}</dd>
+        <dt>Høydeforskjell</dt><dd>${desimal(t.z1 - t.z0)} m (${desimal(t.z0)}–${desimal(t.z1)} moh.)</dd>
+        <dt>Under ${g1} %</dt><dd>${t.f[0]} % av arealet</dd>
+        <dt>${g1}–${g2} %</dt><dd>${t.f[1]} % av arealet</dd>
+        <dt>Over ${g2} %</dt><dd>${t.f[2]} % av arealet</dd>
+        <dt>Brukbart</dt><dd>${m2(t.a)}</dd>
+      </dl>
+      <p class="lagmerknad">Brukbart: minst ${tt.kjerne_bredde} m bredt og slakere enn ${g1} %. ${esc(tt.kilde)}${t.o > 1 ? `, ${t.o} m oppløsning` : ""}.</p>`;
+  }
   const tomtCache = new Map();   // ferdig HTML per eiendom, så boksen kan tegnes på nytt uten ny beregning
   let maalCache = null;
-  const lastTomtForm = () => tomtForm || (tomtForm = hentJson("data/tomt_form.json?v=13").catch(() => null));
+  const lastTomtForm = () => tomtForm || (tomtForm = hentJson("data/tomt_form.json?v=14").catch(() => null));
 
   function brukbarhetHtml(p, tf) {
     const t = tf && tf.tomter[p.e];
@@ -343,10 +365,11 @@
     // Boksens innhold lages av eiendomPopup; update() tegner den på nytt med resultatet fra hurtigbufferen
     Promise.all([
       lastTomtForm(),
+      lastTomtTerreng(),
       window.Dekning ? window.Dekning.gangFraTomt(grensepunkter(f.geometry), maalForAnlegg(),
         GANGTIDER.map((m) => m * GANG_M_PER_MIN), SOK_MAKS) : Promise.resolve(null)
-    ]).then(([tf, r]) => {
-      tomtCache.set(p.e, brukbarhetHtml(p, tf) + (r ? gangHtml(r) : '<p class="lagmerknad">Gangavstand kunne ikke beregnes.</p>'));
+    ]).then(([tf, tt, r]) => {
+      tomtCache.set(p.e, brukbarhetHtml(p, tf) + terrengHtml(p, tt) + (r ? gangHtml(r) : '<p class="lagmerknad">Gangavstand kunne ikke beregnes.</p>'));
       if (popup && popup.isOpen()) popup.update();
     });
   }
@@ -897,7 +920,7 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=13`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=14`)));
     })
     .then(([sk, bh, id, by]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
@@ -930,6 +953,7 @@
         if (window.Dekning) window.Dekning.forhaand();
         if (window.Skolekap) window.Skolekap.forhaand();
         lastTomtForm();
+        lastTomtTerreng();
       });
     })
     .catch(() => {
