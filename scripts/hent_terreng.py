@@ -61,7 +61,7 @@ def hent_dtm(x0, y0, x1, y1, opp):
         q = {"service": "WCS", "version": "1.0.0", "request": "GetCoverage", "coverage": cov,
              "crs": "EPSG:25833", "bbox": f"{x0},{y0},{x1},{y1}", "width": w, "height": h,
              "format": "GeoTIFF"}
-        for forsok in range(3):
+        for forsok in range(5):
             try:
                 with urlopen(Request(f"{WCS}?{urlencode(q)}", headers={"User-Agent": "oslokart"}), timeout=90) as r:
                     data = r.read()
@@ -72,7 +72,7 @@ def hent_dtm(x0, y0, x1, y1, opp):
                 break
             except Exception as e:  # noqa: BLE001
                 siste = str(e).encode()
-                time.sleep(2 * (forsok + 1))
+                time.sleep(15 * (forsok + 1))  # tjenesten avviser tilkoblinger ved for mange kall
     raise RuntimeError(f"Fikk ikke GeoTIFF: {siste!r}")
 
 
@@ -211,7 +211,7 @@ def main():
         sys.exit(f"Første forespørsel feilet: {ex}")
     print(f"Coverage: {COVERAGE}", flush=True)
     start = time.time()
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         jobber = {pool.submit(kjor, o): o for o in oppgaver[1:]}
         for i, f in enumerate(as_completed(jobber), 1):
             o = jobber[f]
