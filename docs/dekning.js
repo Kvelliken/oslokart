@@ -29,7 +29,12 @@
   let aktiv = false;
   let lasting = null;
   let G = null;
-  let N = null;
+  let N = null;          // nettet som brukes i beregningen nå (gangnett eller kjørenett)
+  let NW = null;         // gangnett (meter)
+  let NB = null;         // kjørenett (sekunder), lastes ved behov
+  let KB = null;         // kobling boliger og ruter → kjørenett
+  let lastingBil = null;
+  let bil = false;       // responstid med bil (brannstasjoner) i stedet for gangavstand
   const geo = {};
   let rutelag = null;
   let forslagslag = null;
@@ -51,6 +56,8 @@
     tomtAreal: 1000,
     antall: 3,
     maks: null,
+    utrykning: 1,          // minutter fra alarm til bilen kjører (brannstasjoner)
+    krav: 10,              // responstid forslagene skal dekke (minutter)
     andeler: lesAndeler(),
     faktiskBarnehage: true
   };
@@ -72,9 +79,9 @@
 
   function last() {
     if (lasting) return lasting;
-    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=14"), hent("data/dekning_nett.json?v=14")])
+    lasting = Promise.all([hent("data/dekning_grunnlag.json?v=15"), hent("data/dekning_nett.json?v=15")])
       .then(([g, n]) => {
-        G = g; N = n;
+        G = g; N = NW = n;
         byggNett();
         forberedRuter();
         const fr = G.framskriving || { aar: [] };
@@ -97,9 +104,22 @@
     return lasting;
   }
 
+  function lastBil() {
+    if (lastingBil) return lastingBil;
+    lastingBil = hent("data/dekning_kjorenett.json?v=15").then((k) => {
+      const forrige = N;
+      NB = N = { lon: k.lon, lat: k.lat, kanter: k.kanter };
+      byggNett();
+      N = forrige;
+      KB = { ep_node: k.ep_node, celle_node: k.celle_node, celle_avstand: k.celle_avstand };
+      return true;
+    }).catch(() => { lastingBil = null; return false; });
+    return lastingBil;
+  }
+
   function hentGeo(niva) {
     if (geo[niva]) return Promise.resolve(geo[niva]);
-    return hent(`data/omrader_${niva}.geojson?v=14`).then((g) => (geo[niva] = g));
+    return hent(`data/omrader_${niva}.geojson?v=15`).then((g) => (geo[niva] = g));
   }
 
   // ---------- Nett ----------
@@ -230,6 +250,7 @@
   // Flerkilde-Dijkstra fra punktene på tomtegrensen, avgrenset til maks meter.
   // maal: { nokkel: [anlegg] } → nærmeste anlegg per nøkkel. grenser: meter for persontelling.
   function gangFraTomt(kilder, maal, grenser, maks) {
+    N = NW;
     const { start, til, len, wDist: D, wStempel: S } = N;
     const st = ++N.stempel;
     hTom();
@@ -312,6 +333,19 @@
       return;
     }
     const f = hoved[0];
+    const vilBil = f === "beredskap" && anlegg.every((p) => p.u === "Brannstasjon");
+    if (vilBil && !NB) {
+      visMelding("");
+      ui.utvalg.textContent = "Laster kjørenettet …";
+      lastBil().then((ok) => {
+        if (ok) beregn();
+        else visMelding("Kjørenettet for responstid er ikke klart ennå. Det bygges av en jobb i repoet.");
+      });
+      return;
+    }
+    settBil(vilBil);
+    N = bil ? NB : NW;
+    const epNode = bil ? KB.ep_node : G.ep_node;
     if (f !== forrigeFormal) {
       forrigeFormal = f;
       if (!tilstand.avstandSatt) settAvstand(AVSTAND[f] || 1000);
@@ -320,23 +354,25 @@
     const kap = KAPASITET[f];
     ui.kapFelt.hidden = !kap;
 
-    const nokkel = anlegg.map((p) => p.id).sort((a, b) => a - b).join(",");
+    const nokkel = (bil ? "b:" : "g:") + anlegg.map((p) => p.id).sort((a, b) => a - b).join(",");
     if (nettCache.nokkel !== nokkel) {
       const perNode = new Map(), grupper = [], anleggGruppe = new Map();
       anlegg.forEach((p) => {
         const s = naermesteNode(p.lat, p.lon);
         if (s.node < 0) return;
         let gi = perNode.get(s.node);
-        if (gi === undefined) { gi = grupper.length; perNode.set(s.node, gi); grupper.push({ node: s.node, d: s.d, anlegg: [] }); }
+        // I kjørenettet er avstanden tid: strekningen fra stasjonen til veien regnes med 30 km/t
+        const d0 = bil ? s.d / BIL_TILKOBLING : s.d;
+        if (gi === undefined) { gi = grupper.length; perNode.set(s.node, gi); grupper.push({ node: s.node, d: d0, anlegg: [] }); }
         grupper[gi].anlegg.push(p);
-        grupper[gi].d = Math.min(grupper[gi].d, s.d);
+        grupper[gi].d = Math.min(grupper[gi].d, d0);
         anleggGruppe.set(p.id, gi);
       });
       nettCache = { nokkel, grupper, anleggGruppe, ...nedslagsfelt(grupper) };
     }
     const { grupper, anleggGruppe, dist, eier } = nettCache;
 
-    const andel = brukerandeler(f);
+    const andel = bil ? new Array(13).fill(100) : brukerandeler(f);
     const bhAndel = G.barnehageandel_1_5 || {};
     const fakt = tilstand.aar && G.framskriving ? G.framskriving.faktor[tilstand.aar] : null;
     const brukereOmrade = G.omrader.map((o) => {
@@ -360,7 +396,7 @@
     for (let i = 0; i < ep; i++) {
       const b = brukereOmrade[G.ep_omrade[i]] * G.ep_vekt[i];
       epB[i] = b;
-      const e = eier[G.ep_node[i]];
+      const e = eier[epNode[i]];
       if (e >= 0) brukereGruppe[e] += b;
     }
     const kapasitet = grupper.map((g) => {
@@ -371,6 +407,10 @@
     const overskudd = grupper.map((g, i) => (kapasitet[i] != null && brukereGruppe[i] > kapasitet[i]
       ? 1 - kapasitet[i] / brukereGruppe[i] : 0));
 
+    if (bil) {
+      beregnBil({ f, anlegg, grupper, anleggGruppe, brukereGruppe, epB, dist, epNode });
+      return;
+    }
     const X = tilstand.avstand;
     const brukKap = !!kap && tilstand.kap;
     const epU = new Float64Array(ep);
@@ -397,6 +437,62 @@
     tegnRuter();
     oppsummerOmrader();
     api.oppdaterTegnforklaring();
+  }
+
+  // ---------- Responstid med bil (brannstasjoner) ----------
+  const BIL_TILKOBLING = 30 / 3.6;           // m/s fra stasjonen til nærmeste vei
+  const BAAND = [10, 20];                    // minutter
+
+  function beregnBil({ f, anlegg, grupper, anleggGruppe, brukereGruppe, epB, dist, epNode }) {
+    const T = tilstand.utrykning * 60;
+    const X = tilstand.krav * 60;
+    const ep = epNode.length;
+    const epT = new Float64Array(ep);
+    const epU = new Float64Array(ep);
+    const nc = G.celler.n;
+    const celleU = new Float64Array(nc), celleB = new Float64Array(nc), celleTB = new Float64Array(nc);
+    const tot = { brukere: 0, avstand: 0, kapasitet: 0, baand: [0, 0, 0] };
+    for (let i = 0; i < ep; i++) {
+      const t = dist[epNode[i]] + T;
+      epT[i] = t;
+      const b = epB[i];
+      if (b <= 0) continue;
+      tot.brukere += b;
+      tot.baand[t <= BAAND[0] * 60 ? 0 : t <= BAAND[1] * 60 ? 1 : 2] += b;
+      const c = G.ep_celle[i];
+      celleB[c] += b;
+      celleTB[c] += (Number.isFinite(t) ? t : 3600) * b;
+      if (!(t <= X)) { epU[i] = b; tot.avstand += b; celleU[c] += b; }
+    }
+    // Tid per rute: befolkningsvektet snitt, ellers tiden til rutens nærmeste vei
+    const celleT = new Float64Array(nc);
+    for (let c = 0; c < nc; c++) {
+      celleT[c] = celleB[c] > 0 ? celleTB[c] / celleB[c] : dist[KB.celle_node[c]] + T;
+    }
+    R = { bil: true, f, kap: null, anlegg, grupper, anleggGruppe, kapasitet: grupper.map(() => null), brukereGruppe,
+      overskudd: grupper.map(() => 0), epB, epU, epT, celleU, celleB, celleT, tot, manglerKap: 0 };
+    visResultat();
+    tegnRuter();
+    oppsummerOmrader();
+    api.oppdaterTegnforklaring();
+  }
+
+  function baandFarge(t) {
+    const F = api.FARGE;
+    return t <= BAAND[0] * 60 ? F.gronn : t <= BAAND[1] * 60 ? F.gul : F.rod;
+  }
+  const minTekst = (sek) => (Number.isFinite(sek) ? `${api.fmt.format(Math.round(sek / 6) / 10)} min` : "ikke nådd");
+
+  // Bytter mellom gangavstand og responstid i panelet
+  function settBil(paa) {
+    if (bil === paa && ui.bilSatt) return;
+    bil = paa;
+    ui.bilSatt = true;
+    ui.gangFelt.forEach((el) => { el.hidden = paa; });
+    ui.bilFelt.forEach((el) => { el.hidden = !paa; });
+    ui.steg2.textContent = paa ? "Befolkning og responstid" : "Brukere og gangavstand";
+    ui.steg3.textContent = paa ? "Responstid" : "Udekket behov";
+    nettCache = { nokkel: null };
   }
 
   // ---------- Klasser og farger (antall udekkede brukere per rute) ----------
@@ -432,6 +528,17 @@
     const rend = L.canvas({ padding: 0.5 });
     rutelag = L.layerGroup();
     const fmt = api.fmt;
+    if (R.bil) {
+      for (let c = 0; c < G.celler.n; c++) {
+        const t = R.celleT[c];
+        if (!G.celler.kandidat[c] && R.celleB[c] < 0.5) continue;
+        L.rectangle(cellebokser(c), { renderer: rend, stroke: false, fillColor: baandFarge(t), fillOpacity: 0.55 })
+          .bindTooltip(`Responstid ca. ${minTekst(t)}` + (R.celleB[c] >= 0.5 ? `, ${fmt.format(Math.round(R.celleB[c]))} bosatte` : ""), { sticky: true })
+          .addTo(rutelag);
+      }
+      rutelag.addTo(kart);
+      return;
+    }
     for (let c = 0; c < G.celler.n; c++) {
       const u = R.celleU[c];
       if (u < R.klasser.min) continue;
@@ -462,6 +569,24 @@
       ".";
     const udekket = tot.avstand + tot.kapasitet;
     const pst = tot.brukere > 0 ? Math.round(udekket / tot.brukere * 100) : 0;
+    if (R.bil) {
+      const p = (x) => (tot.brukere > 0 ? Math.round(x / tot.brukere * 100) : 0);
+      const [a, b, c] = tot.baand;
+      ui.resultat.innerHTML = `<div class="nokkeltall dk-baand">
+          <div class="tall"><span>${p(a)} %</span><small>innen ${BAAND[0]} min</small><small class="sk-detalj">${fmt.format(Math.round(a))} personer</small></div>
+          <div class="tall"><span>${p(b)} %</span><small>${BAAND[0]}–${BAAND[1]} min</small><small class="sk-detalj">${fmt.format(Math.round(b))} personer</small></div>
+          <div class="tall"><span>${p(c)} %</span><small>over ${BAAND[1]} min</small><small class="sk-detalj">${fmt.format(Math.round(c))} personer</small></div>
+        </div>
+        <p class="lagmerknad">Responstid er her tid fra alarm til første bil er fremme: ${fmt.format(tilstand.utrykning)} min utrykningstid pluss kjøretid langs veinettet med fartsgrensen.
+        Bosatte ${tilstand.aar || G.aar.delbydel}${tilstand.marka ? "" : ", uten Marka"}. Kartet viser responstiden per rute på 250 × 250 m.
+        Stasjoner i nabokommunene er ikke med, så tiden nær kommunegrensen kan være lenger enn i virkeligheten.</p>`;
+      ui.finn.disabled = udekket < 1;
+      ui.utvalg.insertAdjacentHTML("beforeend", `<span class="dk-sammendrag"><strong>${p(a)} %</strong> når innen ${BAAND[0]} min, <strong>${p(a + b)} %</strong> innen ${BAAND[1]} min.
+        <button type="button" class="lenkeknapp" id="dk-til-resultat" data-rull>Se responstid og forslag</button></span>`);
+      document.getElementById("dk-til-resultat").addEventListener("click", () =>
+        document.getElementById("dk-steg-3").scrollIntoView({ behavior: "smooth", block: "start" }));
+      return;
+    }
     ui.resultat.innerHTML = `<div class="nokkeltall">
         <div class="tall"><span>${fmt.format(Math.round(udekket))}</span><small>udekkede brukere (${pst} %)</small></div>
         <div class="tall"><span>${fmt.format(Math.round(tot.brukere))}</span><small>brukere${tilstand.aar ? " i " + tilstand.aar : ""}</small></div>
@@ -499,8 +624,8 @@
       const fmt = api.fmt, esc = api.esc;
       ui.liste.innerHTML = rader.length ? rader.map(([k, r]) => `<li><button type="button" data-omrade="${esc(k)}">
           <span>${esc(navn[k] || k)}</span><span class="areal">${fmt.format(Math.round(r.u))}</span>
-          <span class="sted">${Math.round(r.u / r.b * 100)} % av ${fmt.format(Math.round(r.b))} brukere er udekket</span></button></li>`).join("")
-        : '<li class="tom">Ingen udekkede brukere med disse innstillingene.</li>';
+          <span class="sted">${Math.round(r.u / r.b * 100)} % av ${fmt.format(Math.round(r.b))} ${R.bil ? `bosatte når over ${tilstand.krav} min` : "brukere er udekket"}</span></button></li>`).join("")
+        : `<li class="tom">${R.bil ? `Alle nås innen ${tilstand.krav} min.` : "Ingen udekkede brukere med disse innstillingene."}</li>`;
     });
   }
 
@@ -530,7 +655,8 @@
       for (let c = 0; c < C.n; c++) {
         if (!C.kandidat[c]) continue;
         const [[a, b], [d, e]] = cellebokser(c);
-        ut.push({ type: "rute", c, node: C.node[c], lat: (a + d) / 2, lon: (b + e) / 2 });
+        if (R && R.bil && KB.celle_avstand[c] > 300) continue;
+        ut.push({ type: "rute", c, node: R && R.bil ? KB.celle_node[c] : C.node[c], lat: (a + d) / 2, lon: (b + e) / 2 });
       }
     } else {
       api.tomtKandidater(tilstand.tomtAreal).forEach((t) => {
@@ -547,6 +673,7 @@
     if (forslagslag) { api.kart.removeLayer(forslagslag); forslagslag = null; }
     if (markering) { api.kart.removeLayer(markering); markering = null; }
     ui.forslag.innerHTML = "";
+    N = R.bil ? NB : NW;
     const kand = kandidater();
     if (!kand.length) { ui.forslagStatus.textContent = "Ingen kandidater med disse innstillingene."; return; }
     const perNode = new Map();
@@ -557,7 +684,9 @@
     for (let c = 0; c < C.n; c++) if (R.celleU[c] >= 0.5) krav.push(c);
     const u = new Float64Array(krav.length);
     krav.forEach((c, i) => { u[i] = R.celleU[c]; });
-    const X = tilstand.avstand;
+    // Gangavstand i meter, eller kjøretid i sekunder (kravet minus utrykningstiden)
+    const X = R.bil ? Math.max(0, (tilstand.krav - tilstand.utrykning) * 60) : tilstand.avstand;
+    const kravNode = R.bil ? KB.celle_node : C.node;
     const kravNaar = new Array(krav.length);
     const kandNaar = kand.map(() => []);
 
@@ -569,7 +698,7 @@
       const slutt = performance.now() + 40;
       while (i < krav.length && performance.now() < slutt) {
         const funnet = [];
-        avgrenset(C.node[krav[i]], X, (v) => {
+        avgrenset(kravNode[krav[i]], X, (v) => {
           const l = perNode.get(v);
           if (l) for (const k of l) funnet.push(k);
         });
@@ -590,7 +719,7 @@
   function velgGraadig(kand, krav, u, kravNaar, kandNaar) {
     const score = new Float64Array(kand.length);
     kandNaar.forEach((l, k) => { let s = 0; for (const d of l) s += u[d]; score[k] = s; });
-    const maks = tilstand.maks && tilstand.maks > 0 ? tilstand.maks : Infinity;
+    const maks = !R.bil && tilstand.maks && tilstand.maks > 0 ? tilstand.maks : Infinity;
     const valgt = [];
     for (let n = 0; n < tilstand.antall; n++) {
       let best = -1, bs = 0;
@@ -622,20 +751,23 @@
 
   function visForslag(valgt) {
     const fmt = api.fmt, esc = api.esc, kart = api.kart;
+    const innen = R.bil ? `innen ${fmt.format(tilstand.krav)} min responstid` : `innen ${fmt.format(tilstand.avstand)} m gange`;
+    const hvem = R.bil ? "personer som i dag har lengre responstid" : "brukere som i dag er udekket";
     if (!valgt.length) {
-      ui.forslagStatus.textContent = "Fant ingen plassering som dekker udekkede brukere innen gangavstanden.";
+      ui.forslagStatus.textContent = R.bil ? "Fant ingen plassering som gir flere personer kortere responstid enn kravet."
+        : "Fant ingen plassering som dekker udekkede brukere innen gangavstanden.";
       return;
     }
     const sum = valgt.reduce((s, v) => s + v.nye, 0);
     ui.forslagStatus.textContent = `${valgt.length} forslag dekker til sammen ${fmt.format(Math.round(sum))} av ` +
-      `${fmt.format(Math.round(R.tot.avstand + R.tot.kapasitet))} udekkede brukere innen ${fmt.format(tilstand.avstand)} m gange.` +
-      (tilstand.maks ? ` Hvert nytt tilbud tar høyst ${fmt.format(tilstand.maks)} brukere.` : "") +
+      `${fmt.format(Math.round(R.tot.avstand + R.tot.kapasitet))} ${R.bil ? `personer med responstid over ${tilstand.krav} min` : "udekkede brukere"}, ${innen}.` +
+      (tilstand.maks && !R.bil ? ` Hvert nytt tilbud tar høyst ${fmt.format(tilstand.maks)} brukere.` : "") +
       " Klikk på et forslag for å se hvilke ruter det dekker.";
     forslagslag = L.layerGroup().addTo(kart);
     valgt.forEach((v, i) => {
       const ikon = L.divIcon({ className: "", html: `<span class="dk-merke">${i + 1}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] });
       const tekst = `<div class="popup"><h3>Forslag ${i + 1}: ${esc(forslagNavn(v))}</h3>
-        <p>Dekker ca. ${fmt.format(Math.round(v.nye))} brukere som i dag er udekket, innen ${fmt.format(tilstand.avstand)} m gange.</p>
+        <p>Dekker ca. ${fmt.format(Math.round(v.nye))} ${hvem}, ${innen}.</p>
         ${v.k.type === "tomt" ? `<p class="under">${esc(api.FORVALTER[v.k.p.f].navn)} · ${fmt.format(v.k.p.m2)} m²</p>
         <div class="lenker"><button type="button" class="lenkeknapp" data-tomt="${esc(v.k.p.e)}">Vis tomten</button></div>` : ""}</div>`;
       L.marker([v.k.lat, v.k.lon], { icon: ikon, zIndexOffset: 1000 }).bindPopup(tekst, { maxWidth: 300 })
@@ -643,7 +775,7 @@
     });
     ui.forslag.innerHTML = valgt.map((v, i) => `<li><button type="button" data-forslag="${i}">
         <span><span class="dk-merke">${i + 1}</span>${esc(forslagNavn(v))}</span><span class="areal">+${fmt.format(Math.round(v.nye))}</span>
-        <span class="sted">${v.k.type === "tomt" ? `${esc(api.FORVALTER[v.k.p.f].navn)} · ${fmt.format(v.k.p.m2)} m²` : "Rute på 250 × 250 m"} · nye brukere innen ${fmt.format(tilstand.avstand)} m</span>
+        <span class="sted">${v.k.type === "tomt" ? `${esc(api.FORVALTER[v.k.p.f].navn)} · ${fmt.format(v.k.p.m2)} m²` : "Rute på 250 × 250 m"} · ${R.bil ? "flere" : "nye brukere"} ${innen}</span>
       </button></li>`).join("");
     ui.forslag._valgt = valgt;
     api.oppdaterTegnforklaring();
@@ -681,6 +813,11 @@
     if (!aktiv || !R) return "";
     const k = R.klasser, fmt = api.fmt;
     const rad = (c, t) => `<div><i style="background:${c}"></i>${api.esc(t)}</div>`;
+    if (R.bil) {
+      const F = api.FARGE;
+      return `<p class="tf-tittel">Responstid</p>${rad(F.gronn, `Innen ${BAAND[0]} min`)}${rad(F.gul, `${BAAND[0]}–${BAAND[1]} min`)}${rad(F.rod, `Over ${BAAND[1]} min`)}` +
+        (forslagslag ? '<div><span class="dk-merke tf-merke">1</span>Forslag til ny stasjon</div>' : "");
+    }
     const rader = k.farger.map((c, i) => {
       const fra = i === 0 ? 1 : k.grenser[i - 1], til = i < k.grenser.length ? k.grenser[i] : null;
       return rad(c, til == null ? `${fmt.format(fra)} eller flere` : `${fmt.format(fra)}–${fmt.format(Math.max(fra, til - 1))}`);
@@ -696,6 +833,14 @@
     const fmt = api.fmt;
     const b = R.brukereGruppe[gi], g = R.grupper[gi], k = R.kapasitet[gi];
     const delt = g.anlegg.length > 1 ? ` Deles med ${g.anlegg.length - 1} tilbud på samme sted.` : "";
+    if (R.bil) {
+      let innen = 0;
+      for (let i = 0; i < R.epB.length; i++) {
+        // bosatte som har denne stasjonen som nærmeste og nås innen første tidsgrense
+        if (R.epB[i] > 0 && R.epT[i] <= BAAND[0] * 60 && nettCache.eier[KB.ep_node[i]] === gi) innen += R.epB[i];
+      }
+      return `<p class="merk">Nærmeste stasjon for ca. ${fmt.format(Math.round(b))} bosatte, herav ${fmt.format(Math.round(innen))} innen ${BAAND[0]} min.${delt}</p>`;
+    }
     const kapTekst = R.kap ? (k == null ? " Kapasitet mangler." : ` Kapasitet ${fmt.format(k)}${R.overskudd[gi] > 0 ? `, ${fmt.format(Math.round(b - k))} flere brukere enn plasser` : ""}.`) : "";
     return `<p class="merk">Nedslagsfelt: ca. ${fmt.format(Math.round(b))} brukere.${delt}${kapTekst}</p>`;
   }
@@ -708,8 +853,19 @@
       avstand: $("dk-avstand"), avstandVerdi: $("dk-avstand-verdi"), tabell: $("dk-andel-tabell"),
       andelerTekst: $("dk-andeler-tekst"), kapFelt: $("dk-kap-felt"), resultat: $("dk-resultat"),
       niva: $("dk-niva"), liste: $("dk-liste"), tomtFelt: $("dk-tomt-felt"), finn: $("dk-finn"),
-      forslag: $("dk-forslag"), forslagStatus: $("dk-forslag-status"), kilde: $("dk-kilde")
+      forslag: $("dk-forslag"), forslagStatus: $("dk-forslag-status"), kilde: $("dk-kilde"),
+      gangFelt: [...document.querySelectorAll(".dk-gang")], bilFelt: [...document.querySelectorAll(".dk-bil")],
+      steg2: $("dk-steg-2-tekst"), steg3: $("dk-steg-3-tekst"), utrykning: $("dk-utrykning"), krav: $("dk-krav")
     });
+    ui.utrykning.value = tilstand.utrykning;
+    ui.krav.value = tilstand.krav;
+    ui.utrykning.addEventListener("change", () => {
+      const v = Math.max(0, Math.min(15, +String(ui.utrykning.value).replace(",", ".") || 0));
+      ui.utrykning.value = v;
+      tilstand.utrykning = v;
+      beregn();
+    });
+    ui.krav.addEventListener("change", () => { tilstand.krav = +ui.krav.value; beregn(); });
     ui.aar.addEventListener("change", () => { tilstand.aar = ui.aar.value; beregn(); });
     let t;
     ui.avstand.addEventListener("input", () => {

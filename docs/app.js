@@ -156,6 +156,128 @@
   kart.getPane("punkter").style.zIndex = 450;
 
   const renderer = L.canvas({ padding: 0.5, tolerance: 4 });
+
+  // ---------- Kartlag som kan legges over: kvikkleire og fredede bygninger ----------
+  kart.createPane("overlegg");
+  kart.getPane("overlegg").style.zIndex = 430;
+  kart.createPane("overlegg-punkter");
+  kart.getPane("overlegg-punkter").style.zIndex = 445;
+  // SVG, så faresonene kan skraveres og ikke forveksles med eiendommenes farger
+  const overleggRenderer = L.svg({ padding: 0.5, pane: "overlegg" });
+  const overleggPunktRenderer = L.canvas({ padding: 0.5, tolerance: 3, pane: "overlegg-punkter" });
+  const FAREGRAD = { "Høy": FARGE.rod, "Middels": FARGE.gul, "Lav": FARGE.morkBeige, "Ingen": FARGE.beige };
+  const KONSEKVENS = { 1: "Mindre alvorlig", 2: "Alvorlig", 3: "Meget alvorlig" };
+  const overlegg = {
+    kvikkleire: { navn: "Kvikkleire (faresoner)", fil: "kvikkleire.geojson", lag: null, paa: false },
+    fredet: { navn: "Fredede bygninger", fil: "fredabygninger.json", lag: null, paa: false }
+  };
+  const lenke = (u) => (!u ? "" : /^https?:/.test(u) ? u : "https://" + u);
+
+  function kvikkleirePopup(p) {
+    const utlop = p.t === "u";
+    return `<div class="popup"><h3>${esc(p.n || "Kvikkleiresone")}</h3>
+      <p class="under">${utlop ? "Utløpsområde: her kan skredmassene havne" : "Faresone: her kan et kvikkleireskred løses ut"}</p>
+      <dl>
+        <dt>Faregrad</dt><dd>${esc(p.fg || "Ikke oppgitt")}</dd>
+        ${p.kk ? `<dt>Konsekvens</dt><dd>${esc(KONSEKVENS[p.kk] || p.kk)}</dd>` : ""}
+        ${p.rk ? `<dt>Risikoklasse</dt><dd>${p.rk} av 5</dd>` : ""}
+        ${p.o ? `<dt>Utredet av</dt><dd>${esc(p.o)}</dd>` : ""}
+      </dl>
+      ${p.r ? `<div class="lenker"><a href="${esc(lenke(p.r))}" target="_blank" rel="noopener">Rapporter fra NVE</a></div>` : ""}
+      <p class="kilde">Kilde: NVE, faresoner for kvikkleire.</p></div>`;
+  }
+
+  function fredetPopup(p) {
+    return `<div class="popup"><h3>${esc(p.n || "Fredet bygning")}</h3>
+      <p class="under">${esc(p.v || "Fredet")}</p>
+      <dl>
+        ${p.p ? `<dt>Hjemmel</dt><dd>§ ${esc(p.p)}</dd>` : ""}
+        ${p.d ? `<dt>Vernedato</dt><dd>${dato(p.d)}</dd>` : ""}
+        ${p.da ? `<dt>Datering</dt><dd>${esc(p.da)}</dd>` : ""}
+      </dl>
+      ${p.w ? `<div class="lenker"><a href="${esc(p.w)}" target="_blank" rel="noopener">Se i Kulturminnesøk</a></div>` : ""}
+      <p class="kilde">Kilde: ${esc(p.o || "Riksantikvaren")}, fredede bygninger.</p></div>`;
+  }
+
+  function lagOverlegg(id, data) {
+    if (id === "kvikkleire") {
+      // utløpsområdene tegnes under faresonene
+      const sortert = { ...data, features: [...data.features].sort((a, b) => (a.properties.t === "u" ? -1 : 1) - (b.properties.t === "u" ? -1 : 1)) };
+      const lag = L.geoJSON(sortert, {
+        renderer: overleggRenderer, pane: "overlegg",
+        style: (f) => (f.properties.t === "u"
+          ? { color: FARGE.morkBla, weight: 1.5, dashArray: "5 4", fillColor: "url(#kv-utlop)", fillOpacity: 1 }
+          : { color: FAREGRAD[f.properties.fg] === FARGE.beige ? FARGE.morkBeige : FAREGRAD[f.properties.fg] || FARGE.morkBeige,
+            weight: 2.5, fillColor: `url(#kv-${(f.properties.fg || "ingen").toLowerCase().replace("ø", "o")})`, fillOpacity: 1 }),
+        onEachFeature: (f, l) => l.bindPopup(() => kvikkleirePopup(f.properties), { maxWidth: 320 })
+      });
+      lag.once("add", lagSkravur);
+      return lag;
+    }
+    const gruppe = L.layerGroup();
+    data.poster.forEach((p) => {
+      L.circleMarker([p.lat, p.lon], { renderer: overleggPunktRenderer, pane: "overlegg-punkter", radius: 4,
+        color: FARGE.morkGronn, weight: 2, fillColor: FARGE.hvit, fillOpacity: 1 })
+        .bindPopup(() => fredetPopup(p), { maxWidth: 320 }).addTo(gruppe);
+    });
+    return gruppe;
+  }
+
+  // Skravurmønstre i SVG-laget: svarte og fargede striper, så sonene skiller seg fra eiendomsfargene
+  function lagSkravur() {
+    const svg = overleggRenderer._container;
+    if (!svg || svg.querySelector("#kv-hoy")) return;
+    const ns = "http://www.w3.org/2000/svg";
+    const defs = document.createElementNS(ns, "defs");
+    const moenster = (id, farge, bredde, avstand) =>
+      `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${avstand}" height="${avstand}" patternTransform="rotate(45)">` +
+      `<rect width="${avstand}" height="${avstand}" fill="${farge}" fill-opacity="0.18"/>` +
+      `<line x1="0" y1="0" x2="0" y2="${avstand}" stroke="${farge}" stroke-width="${bredde}"/>` +
+      `<line x1="${bredde + 1}" y1="0" x2="${bredde + 1}" y2="${avstand}" stroke="#000" stroke-width="1"/></pattern>`;
+    defs.innerHTML = moenster("kv-hoy", FAREGRAD["Høy"], 3, 8) + moenster("kv-middels", FAREGRAD.Middels, 3, 10) +
+      moenster("kv-lav", FARGE.morkBeige, 2, 12) + moenster("kv-ingen", FARGE.morkBeige, 1, 14) +
+      `<pattern id="kv-utlop" patternUnits="userSpaceOnUse" width="6" height="6"><circle cx="3" cy="3" r="1" fill="${FARGE.morkBla}"/></pattern>`;
+    svg.insertBefore(defs, svg.firstChild);
+  }
+
+  function settOverlegg(id, paa) {
+    const o = overlegg[id];
+    o.paa = paa;
+    if (!paa) {
+      if (o.lag) kart.removeLayer(o.lag);
+      lagTegnforklaring();
+      return;
+    }
+    const vis = () => { if (o.paa && o.lag) o.lag.addTo(kart); lagTegnforklaring(); };
+    if (o.lag) { vis(); return; }
+    hentJson(`data/${o.fil}?v=15`).then((d) => { o.lag = lagOverlegg(id, d); vis(); })
+      .catch(() => { o.paa = false; const el = document.querySelector(`[data-overlegg="${id}"]`); if (el) el.checked = false; });
+  }
+
+  function overleggForklaring(rute) {
+    let html = "";
+    if (overlegg.kvikkleire.paa) {
+      html += `<p class="tf-tittel">Kvikkleire</p>` +
+        [["Høy", "hoy"], ["Middels", "middels"], ["Lav", "lav"]].map(([g, k]) => `<div><i class="skravur kv-${k}"></i>Faresone, ${g.toLowerCase()} faregrad</div>`).join("") +
+        `<div><i class="stiplet"></i>Utløpsområde</div>`;
+    }
+    if (overlegg.fredet.paa) html += `<p class="tf-tittel">Kulturminner</p><div><i class="rund fredet"></i>Fredet bygning</div>`;
+    return html;
+  }
+
+  const OverleggKontroll = L.Control.extend({
+    options: { position: "topright" },
+    onAdd() {
+      const div = L.DomUtil.create("div", "overlegg-kontroll");
+      div.innerHTML = `<p class="tf-tittel">Vis i kartet</p>` + Object.entries(overlegg).map(([id, o]) =>
+        `<label class="avkryss"><input type="checkbox" data-overlegg="${id}"> ${esc(o.navn)}</label>`).join("");
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      div.addEventListener("change", (e) => { if (e.target.dataset.overlegg) settOverlegg(e.target.dataset.overlegg, e.target.checked); });
+      return div;
+    }
+  });
+  new OverleggKontroll().addTo(kart);
   const punktRenderer = L.canvas({ padding: 0.5, tolerance: 3, pane: "punkter" });
   let bakgrunnslag = null;
   let hovedlag = null;
@@ -274,7 +396,7 @@
   ];
   let tomtForm = null;
   let tomtTerreng = null;
-  const lastTomtTerreng = () => tomtTerreng || (tomtTerreng = hentJson("data/tomt_terreng.json?v=14").catch(() => null));
+  const lastTomtTerreng = () => tomtTerreng || (tomtTerreng = hentJson("data/tomt_terreng.json?v=15").catch(() => null));
   const RETNING_NAVN = { N: "nord", "NØ": "nordøst", "Ø": "øst", "SØ": "sørøst", S: "sør", SV: "sørvest", V: "vest", NV: "nordvest" };
 
   function terrengHtml(p, tt) {
@@ -297,7 +419,7 @@
   }
   const tomtCache = new Map();   // ferdig HTML per eiendom, så boksen kan tegnes på nytt uten ny beregning
   let maalCache = null;
-  const lastTomtForm = () => tomtForm || (tomtForm = hentJson("data/tomt_form.json?v=14").catch(() => null));
+  const lastTomtForm = () => tomtForm || (tomtForm = hentJson("data/tomt_form.json?v=15").catch(() => null));
 
   function brukbarhetHtml(p, tf) {
     const t = tf && tf.tomter[p.e];
@@ -385,6 +507,8 @@
     (sett.skoler || []).forEach((p) => ut.push({ f: "skole", u: p.u, ei: p.ei, lat: p.lat, lon: p.lon, n: p.n, b: p.b, e: p.e, d: p }));
     (sett.barnehager || []).forEach((p) => ut.push({ f: "barnehage", u: p.u, ei: p.ei, lat: p.lat, lon: p.lon, n: p.n, b: p.b, e: p.e, d: p }));
     (sett.idrett || []).filter((p) => !p.up).forEach((p) => ut.push({ f: "idrett", u: p.u, t: p.t, ei: p.ei, lat: p.lat, lon: p.lon, n: p.n, b: p.b, e: p.e, d: p }));
+    (sett.brann || []).forEach((p) => ut.push({ f: "beredskap", u: "Brannstasjon", ei: "K", lat: p.lat, lon: p.lon, n: p.n, b: p.b, e: p.e,
+      d: { ...p, kilde: "DSB, brannstasjoner (Geonorge)" } }));
     (sett.bygg || []).forEach((p) => {
       const eiendom = eiendomPerNokkel.get(p.e);
       ut.push({
@@ -490,6 +614,9 @@
         ${d.by ? `<dt>Bygget</dt><dd>${d.by}</dd>` : ""}
         ${d.ob && d.ob !== d.by ? `<dt>Sist ombygd</dt><dd>${d.ob}</dd>` : ""}
         <dt>Anleggsnummer</dt><dd>${d.nr}</dd>`;
+    } else if (p.u === "Brannstasjon") {
+      under = esc(d.st || "Brannstasjon");
+      rader = `<dt>Brannvesen</dt><dd>${esc(d.br)}</dd><dt>Bemanning</dt><dd>${esc(d.ka || "Ikke oppgitt")}</dd>`;
     } else {
       under = esc(d.t);
       rader = `<dt>Kategori</dt><dd>${esc(p.u)}</dd><dt>Antall bygg</dt><dd>${d.n}</dd>`;
@@ -497,7 +624,7 @@
     const adresse = d.a ? `<dt>Adresse</dt><dd>${esc(d.a)}</dd>` : "";
     const plassering = d.kp ? '<p class="merk">Plassert etter adressen i Kartverkets adresseregister, fordi skoleregisteret mangler koordinat.</p>' : "";
     const nett = d.w ? `<div class="lenker"><a href="${esc(d.w)}" target="_blank" rel="noopener">Nettside</a></div>` : "";
-    const kilde = `${F.kilde}${hentet[p.f] ? ", hentet " + dato(hentet[p.f]) : ""}.${F.merknad ? " " + F.merknad : ""}`;
+    const kilde = d.kilde ? `${d.kilde}.` : `${F.kilde}${hentet[p.f] ? ", hentet " + dato(hentet[p.f]) : ""}.${F.merknad ? " " + F.merknad : ""}`;
     return `<h3><span class="sirkel" style="background:${F.farge}"></span>${esc(p.n)}</h3>
       <p class="under">${under}</p>
       <dl>${rader}${adresse}${p.b ? `<dt>Bydel</dt><dd>${esc(p.b)}</dd>` : ""}</dl>
@@ -604,7 +731,7 @@
       if (f === "idrett") html += `<p class="lagmerknad">${esc(FORMAL[f].merknad)}${utenPlassering ? ` ${fmt.format(utenPlassering)} anlegg mangler presis plassering og vises ikke.` : ""}</p>`;
     });
     html += `</div></fieldset>
-      <p class="lagmerknad">Skoler og barnehager: Udir${hentet.skole ? ", hentet " + dato(hentet.skole) : ""}. Helse, kultur og beredskap: bygningstype i matrikkelen, bare bygg på kommunal eiendom.</p>
+      <p class="lagmerknad">Skoler og barnehager: Udir${hentet.skole ? ", hentet " + dato(hentet.skole) : ""}. Brannstasjoner: DSB. Øvrige bygg for helse, kultur og beredskap: bygningstype i matrikkelen, bare bygg på kommunal eiendom.</p>
       ${mangler.length ? `<p class="lagmerknad">Mangler data for: ${mangler.map((f) => FORMAL[f].navn.toLowerCase()).join(", ")}. ${mangler.some((f) => f === "skole" || f === "barnehage") ? "Udir-dataene hentes av en ukentlig jobb i repoet." : ""}</p>` : ""}
       <button type="button" id="last-ned-anlegg" class="lenkeknapp">Last ned anleggene som CSV</button>
       </div>`;
@@ -799,6 +926,7 @@
     }
     if (window.Dekning && tilstand.modus === "dekning") html = window.Dekning.tegnforklaring() + html;
     if (window.Skolekap && tilstand.modus === "skolekap") html = window.Skolekap.tegnforklaring();
+    html += overleggForklaring(rute);
     el.innerHTML = html;
     el.hidden = !html;
   }
@@ -920,16 +1048,17 @@
     .then((gj) => {
       data = gj.features;
       eiendomPerNokkel = new Map(data.map((f) => [f.properties.e, f.properties]));
-      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal"].map((n) => hentJson(`data/${n}.json?v=14`)));
+      return Promise.allSettled(["skoler", "barnehager", "idrett", "bygg_formal", "brannstasjoner"].map((n) => hentJson(`data/${n}.json?v=15`)));
     })
-    .then(([sk, bh, id, by]) => {
+    .then(([sk, bh, id, by, br]) => {
       const verdi = (r) => (r.status === "fulfilled" ? r.value : null);
-      const s = verdi(sk), b = verdi(bh), i = verdi(id), g = verdi(by);
+      const s = verdi(sk), b = verdi(bh), i = verdi(id), g = verdi(by), bs = verdi(br);
       if (s) hentet.skole = s.hentet;
       if (b) hentet.barnehage = b.hentet;
       if (i) utenPlassering = i.poster.filter((p) => p.up).length;
       punkter = lagPunkter({
-        skoler: s && s.poster, barnehager: b && b.poster, idrett: i && i.poster, bygg: g && g.poster
+        skoler: s && s.poster, barnehager: b && b.poster, idrett: i && i.poster, bygg: g && g.poster,
+        brann: bs && bs.poster
       });
       koble();
       lagKartlagPanel();

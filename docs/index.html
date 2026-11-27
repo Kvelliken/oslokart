@@ -6,7 +6,7 @@
 <title>Kommunale tomter i Oslo</title>
 <meta name="description" content="Kart over eiendommer Oslo kommune eier, koblet mot matrikkelen. Finn ubebygde tomter og slå opp regulering i Planinnsyn.">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <div class="app">
@@ -43,16 +43,21 @@
       <div id="dk-innhold" hidden>
 
         <div class="dk-steg">
-          <h3><span class="dk-nr">2</span> Brukere og gangavstand</h3>
+          <h3><span class="dk-nr">2</span> <span id="dk-steg-2-tekst">Brukere og gangavstand</span></h3>
           <div class="rad">
             <label class="felt"><span>Befolkning</span>
               <select id="dk-aar"><option value="">I dag</option></select>
             </label>
-            <label class="felt"><span>Akseptabel gangavstand: <output id="dk-avstand-verdi">1 000 m</output></span>
+            <label class="felt dk-bil" hidden><span>Utrykningstid (min)</span>
+              <input type="number" id="dk-utrykning" min="0" max="15" step="0.5" value="1">
+            </label>
+            <label class="felt dk-gang"><span>Akseptabel gangavstand: <output id="dk-avstand-verdi">1 000 m</output></span>
               <input type="range" id="dk-avstand" min="100" max="5000" step="100" value="1000">
             </label>
           </div>
-          <details class="dk-andeler" id="dk-andeler">
+          <p class="lagmerknad dk-bil" hidden>Brannstasjoner regnes med kjøretid langs veinettet i stedet for gangavstand. Alle bosatte regnes med.
+            Utrykningstid er tiden fra alarmen går til bilen kjører ut. Kjøretiden regnes med fartsgrensen og uten kø.</p>
+          <details class="dk-andeler dk-gang" id="dk-andeler">
             <summary>Hvem er brukerne? Andel av hver aldersgruppe</summary>
             <p class="lagmerknad" id="dk-andeler-tekst"></p>
             <div class="dk-andel-tabell" id="dk-andel-tabell"></div>
@@ -63,7 +68,7 @@
         </div>
 
         <div class="dk-steg">
-          <h3 id="dk-steg-3"><span class="dk-nr">3</span> Udekket behov</h3>
+          <h3 id="dk-steg-3"><span class="dk-nr">3</span> <span id="dk-steg-3-tekst">Udekket behov</span></h3>
           <div class="dk-resultat" id="dk-resultat" aria-live="polite"></div>
           <label class="felt"><span>Summer per</span>
             <select id="dk-niva">
@@ -81,6 +86,9 @@
             <label class="avkryss"><input type="radio" name="dk-kandidat" value="rute" checked> Hvor som helst i byggesonen</label>
             <label class="avkryss"><input type="radio" name="dk-kandidat" value="tomt"> Kommunens ubebygde tomter</label>
           </fieldset>
+          <label class="felt dk-bil" hidden><span>Forslagene skal gi flest mulig responstid innen</span>
+            <select id="dk-krav"><option value="10" selected>10 minutter</option><option value="20">20 minutter</option></select>
+          </label>
           <div class="rad">
             <label class="felt" id="dk-tomt-felt" hidden><span>Minste tomt</span>
               <select id="dk-tomt-areal">
@@ -96,7 +104,7 @@
                 <option>1</option><option>2</option><option selected>3</option><option>5</option><option>10</option>
               </select>
             </label>
-            <label class="felt"><span>Maks brukere per tilbud</span>
+            <label class="felt dk-gang"><span>Maks brukere per tilbud</span>
               <input type="number" id="dk-maks" min="0" step="10" placeholder="Ingen grense">
             </label>
           </div>
@@ -227,8 +235,8 @@
 </div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
-<script src="dekning.js?v=14"></script>
-<script src="skolekap.js?v=14"></script>
-<script src="app.js?v=14"></script>
+<script src="dekning.js?v=15"></script>
+<script src="skolekap.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

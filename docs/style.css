@@ -334,3 +334,21 @@ h1 { font-size: 24px; margin-bottom: 4px; }
 .tomt-personer th:first-child { text-align: left; padding-left: 0; }
 .tomt-personer thead th { border-bottom: 1px solid var(--svart); font-size: 12px; }
 .tomt-personer tr.sum td, .tomt-personer tr.sum th { font-weight: 500; border-bottom: 1px solid var(--flate-alt); }
+
+/* Kartlag som kan legges over */
+.overlegg-kontroll { background: var(--flate); border: 1px solid var(--mork-beige); padding: 8px 12px; font-size: 13px; }
+.overlegg-kontroll .tf-tittel { margin: 0 0 4px; }
+.overlegg-kontroll .avkryss { display: flex; align-items: center; gap: 6px; margin: 3px 0; cursor: pointer; }
+.tegnforklaring i.stiplet { border: 1px dashed var(--mork-bla); background: rgba(42, 40, 89, 0.12); }
+.tegnforklaring i.fredet { background: #fff; border: 2px solid var(--mork-gronn); width: 10px; height: 10px; }
+
+/* Responstid: tre tall ved siden av hverandre */
+.dk-baand { padding: 0; margin-bottom: var(--luft-2); }
+.dk-baand .tall { padding: 10px 10px; }
+.dk-baand .tall span { font-size: 22px; }
+.dk-baand .sk-detalj { font-size: 12px; display: block; }
+.tegnforklaring i.skravur { border-width: 2px; }
+.tegnforklaring i.kv-hoy { border-color: #ff8274; background: repeating-linear-gradient(45deg, #ff8274 0 3px, #000 3px 4px, rgba(255,130,116,.18) 4px 8px); }
+.tegnforklaring i.kv-middels { border-color: #f9c66b; background: repeating-linear-gradient(45deg, #f9c66b 0 3px, #000 3px 4px, rgba(249,198,107,.18) 4px 10px); }
+.tegnforklaring i.kv-lav { border-color: #d0bfae; background: repeating-linear-gradient(45deg, #d0bfae 0 2px, #000 2px 3px, rgba(208,191,174,.18) 3px 12px); }
+.tegnforklaring i.stiplet { border: 1.5px dashed var(--mork-bla); background: radial-gradient(var(--mork-bla) 1px, transparent 1.2px) 0 0 / 6px 6px; }
