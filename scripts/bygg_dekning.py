@@ -239,6 +239,27 @@ def main():
         json.dump({"kilde": nett["kilde"], "lon": [round(v * 1e5) for v in lon], "lat": [round(v * 1e5) for v in lat],
                    "kanter": kanter}, f, separators=(",", ":"))
 
+    # --- Kjørenett (responstid for brannstasjoner): boliger og ruter koblet til nærmeste vei
+    kjore = DATA / "kjorenett_raa.json"
+    if kjore.exists():
+        kn = json.load(open(kjore))
+        kx = np.array(kn["x"], dtype=float)
+        ky = np.array(kn["y"], dtype=float)
+        klon, klat = tr.transform(kx, ky)
+        ktre = cKDTree(np.column_stack([kx, ky]))
+        ep_avst, ep_k = ktre.query(np.column_stack([ep_x, ep_y]))
+        cx = (hj[:, 0] + 0.5) * CELLE
+        cy = (hj[:, 1] + 0.5) * CELLE
+        c_avst, c_k = ktre.query(np.column_stack([cx, cy]))
+        with open(OUT / "dekning_kjorenett.json", "w") as f:
+            json.dump({"kilde": kn["kilde"], "enhet": "sekunder",
+                       "lon": [round(v * 1e5) for v in klon], "lat": [round(v * 1e5) for v in klat],
+                       "kanter": [v for k in kn["kanter"] for v in k],
+                       "ep_node": ep_k.astype(int).tolist(), "ep_avstand": np.round(ep_avst).astype(int).tolist(),
+                       "celle_node": c_k.astype(int).tolist(), "celle_avstand": np.round(c_avst).astype(int).tolist()},
+                      f, separators=(",", ":"))
+        print("Kjørenett:", len(kx), "noder")
+
     # --- Grenser for visning
     def skriv_grenser(gdf, navn, felt):
         g = gdf.to_crs(4326).copy()

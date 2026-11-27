@@ -9,6 +9,7 @@ on:
     paths:
       - scripts/hent_befolkning.py
       - scripts/hent_gangnett.py
+      - scripts/hent_kjorenett.py
       - scripts/bygg_dekning.py
       - data/boliger.csv
       - data/delbydeler.geojson
@@ -43,6 +44,9 @@ jobs:
       - name: Hent gangnett fra OpenStreetMap
         run: python scripts/hent_gangnett.py
 
+      - name: Hent kjørenett fra OpenStreetMap
+        run: python scripts/hent_kjorenett.py
+
       - name: Bygg grunnlag for dekningsgrad
         run: python scripts/bygg_dekning.py
 
@@ -51,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/befolkning.json data/gangnett_raa.json docs/data/dekning_*.json docs/data/omrader_*.geojson
+          git add data/befolkning.json data/gangnett_raa.json data/kjorenett_raa.json docs/data/dekning_*.json docs/data/omrader_*.geojson
           if git diff --cached --quiet; then
             echo "endret=false" >> "$GITHUB_OUTPUT"
           else
